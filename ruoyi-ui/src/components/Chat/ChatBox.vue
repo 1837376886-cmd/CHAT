@@ -88,6 +88,13 @@
           <el-button size="mini" icon="el-icon-files" @click="selectFile"></el-button>
           <el-button size="mini" icon="el-icon-s-grid" @click="showEmojiPicker"></el-button>
         </div>
+        <div v-if="emojiPickerVisible" class="emoji-picker">
+          <div class="emoji-grid">
+            <span v-for="(emoji, index) in emojiList" :key="index" class="emoji-item" @click="selectEmoji(emoji)">
+              {{ emoji }}
+            </span>
+          </div>
+        </div>
         <el-input
           v-model="inputMessage"
           type="textarea"
@@ -177,7 +184,9 @@ export default {
       pageSize: 50,
       hasMore: true,
       loadingHistory: false,
-      scrollTimer: null
+      scrollTimer: null,
+      emojiPickerVisible: false,
+      emojiList: ['😀','😃','😄','😁','😆','😅','😂','🤣','😊','😇','🙂','🙃','😉','😌','😍','🥰','😘','😗','😙','😚','😋','😛','😝','😜','🤪','🤨','🧐','🤓','😎','🥸','🤩','🥳','😏','😒','😞','😔','😟','😕','🙁','☹️','😣','😖','😫','😩','🥺','😢','😭','😤','😠','😡','🤬','🤯','😳','🥵','🥶','😱','😨','😰','😥','😓','🤗','🤔','🤭','🤫','🤥','😶','😐','😑','😬','🙄','😯','😦','😧','😮','😲','🥱','😴','🤤','😪','😵','🤐','🥴','🤢','🤮','🤧','😷','🤒','🤕','🤑','🤠','😈','👿','👹','👺','🤡','💩','👻','💀','☠️','👽','👾','🤖','🎃','😺','😸','😹','😻','😼','😽','🙀','😿','😾']
     };
   },
   created() {
@@ -576,7 +585,53 @@ export default {
     },
 
     showEmojiPicker() {
-      this.$message.info('表情选择功能待实现');
+      this.emojiPickerVisible = !this.emojiPickerVisible;
+    },
+
+    selectEmoji(emoji) {
+      this.emojiPickerVisible = false;
+      this.sendEmojiMessage(emoji);
+    },
+
+    async sendEmojiMessage(emoji) {
+      if (!this.currentSessionId) {
+        return;
+      }
+
+      try {
+        const response = await request({
+          url: '/chat/message/send',
+          method: 'post',
+          data: {
+            sessionId: this.currentSessionId,
+            messageType: 3,
+            content: emoji
+          }
+        });
+
+        if (response.code === 200) {
+          const message = response.data;
+          this.messages.push(message);
+          this.$nextTick(() => {
+            this.scrollToBottom();
+          });
+
+          if (this.chatClient && this.wsConnected) {
+            this.chatClient.send({
+              type: this.currentSession.sessionType === 'GROUP' ? MessageType.GROUP_CHAT : MessageType.PRIVATE_CHAT,
+              messageId: message.messageId,
+              sessionId: this.currentSessionId,
+              fromUserId: this.currentUserId,
+              contentType: ContentType.EMOJI,
+              content: emoji,
+              timestamp: new Date().toISOString()
+            });
+          }
+        }
+      } catch (error) {
+        console.error('发送表情失败:', error);
+        this.$message.error('发送表情失败');
+      }
     },
 
     previewImage(url) {
@@ -893,6 +948,7 @@ export default {
 }
 
 .chat-input {
+  position: relative;
   padding: 16px;
   border-top: 1px solid #e8e8e8;
   background-color: white;
@@ -909,5 +965,37 @@ export default {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+}
+
+.emoji-picker {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 16px;
+  background: white;
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  padding: 10px;
+  z-index: 100;
+  max-width: 300px;
+}
+
+.emoji-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 4px;
+}
+
+.emoji-item {
+  font-size: 22px;
+  cursor: pointer;
+  padding: 4px;
+  text-align: center;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.emoji-item:hover {
+  background-color: #f0f0f0;
 }
 </style>

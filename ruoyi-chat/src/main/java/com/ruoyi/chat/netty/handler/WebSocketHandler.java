@@ -2,6 +2,7 @@ package com.ruoyi.chat.netty.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.ruoyi.chat.protocol.ChatMessage;
+import com.ruoyi.chat.protocol.ContentType;
 import com.ruoyi.chat.protocol.MessageType;
 import com.ruoyi.chat.netty.manager.ConnectionManager;
 import com.ruoyi.chat.netty.router.MessageRouter;
@@ -176,11 +177,12 @@ public class WebSocketHandler extends SimpleChannelInboundHandler<WebSocketFrame
             }
             
             // 保存消息到数据库
+            Integer messageType = getMessageTypeCode(message.getContentType());
             chatMessageService.sendMessage(
-                sessionId, 
-                userId, 
-                1, // 默认文本消息类型
-                message.getContent(), 
+                sessionId,
+                userId,
+                messageType,
+                message.getContent(),
                 null
             );
             
@@ -212,6 +214,22 @@ public class WebSocketHandler extends SimpleChannelInboundHandler<WebSocketFrame
         heartbeatResponse.setTimestamp(new Date());
         
         ctx.channel().writeAndFlush(new TextWebSocketFrame(JSON.toJSONString(heartbeatResponse)));
+    }
+
+    /**
+     * 将协议层 ContentType 映射为数据库整数消息类型
+     */
+    private Integer getMessageTypeCode(ContentType contentType) {
+        if (contentType == null) {
+            return 1;
+        }
+        switch (contentType) {
+            case TEXT:  return 1;
+            case IMAGE: return 2;
+            case EMOJI: return 3;
+            case FILE:  return 4;
+            default:    return 1;
+        }
     }
 
     /**
