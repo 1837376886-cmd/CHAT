@@ -67,6 +67,7 @@ import { getCodeImg } from "@/api/login"
 import Cookies from "js-cookie"
 import { encrypt, decrypt } from '@/utils/jsencrypt'
 import GuestChatWidget from '@/components/CustomerService/GuestChatWidget'
+import { confirmBindHistory } from '@/api/cs'
 
 export default {
   name: "Login",
@@ -147,6 +148,10 @@ export default {
             Cookies.remove('rememberMe')
           }
           this.$store.dispatch("Login", this.loginForm).then(() => {
+            const deviceFp = localStorage.getItem('cs_device_fp')
+            if (deviceFp) {
+              confirmBindHistory(deviceFp).catch(() => {})
+            }
             this.$router.push({ path: this.redirect || "/" }).catch(()=>{})
           }).catch(() => {
             this.loading = false

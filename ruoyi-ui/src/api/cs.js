@@ -104,10 +104,11 @@ export function getCsMyHistory() {
   })
 }
 
-export function confirmBindHistory() {
+export function confirmBindHistory(deviceFingerprint) {
   return request({
     url: '/cs/bind/confirm',
-    method: 'post'
+    method: 'post',
+    data: { deviceFingerprint }
   })
 }
 

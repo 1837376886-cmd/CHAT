@@ -426,13 +426,16 @@ public class CustomerServiceController {
     }
 
     /**
-     * 确认绑定匿名客服历史
+     * 确认绑定匿名客服历史（按设备指纹）
      */
     @PostMapping("/bind/confirm")
-    public AjaxResult confirmBind(HttpServletRequest request) {
+    public AjaxResult confirmBind(@RequestBody Map<String, String> params) {
         SysUser user = SecurityUtils.getLoginUser().getUser();
-        String ip = getClientIp(request);
-        int count = chatVisitorService.bindByLogin(user.getUserId(), ip);
+        String deviceFingerprint = params.get("deviceFingerprint");
+        if (deviceFingerprint == null || deviceFingerprint.isEmpty()) {
+            return AjaxResult.error("缺少设备指纹");
+        }
+        int count = chatVisitorService.bindByLogin(user.getUserId(), deviceFingerprint);
         return AjaxResult.success("已绑定 " + count + " 条历史记录");
     }
 

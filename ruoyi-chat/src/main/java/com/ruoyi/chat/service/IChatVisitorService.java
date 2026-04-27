@@ -28,9 +28,9 @@ public interface IChatVisitorService extends IService<ChatVisitor> {
     void updateLastCsUserId(Long visitorId, Long csUserId);
 
     /**
-     * 登录后按IP绑定访客记录
+     * 登录后按设备指纹绑定访客记录
      */
-    int bindByLogin(Long userId, String ip);
+    int bindByLogin(Long userId, String deviceFingerprint);
 
     /**
      * 根据IP查询未绑定的访客列表

@@ -68,8 +68,16 @@ public class ChatVisitorServiceImpl extends ServiceImpl<ChatVisitorMapper, ChatV
     }
 
     @Override
-    public int bindByLogin(Long userId, String ip) {
-        return chatVisitorMapper.bindUserIdByIp(userId, ip, 90);
+    public int bindByLogin(Long userId, String deviceFingerprint) {
+        // 该设备指纹已被其他用户绑定过，则不再允许绑定（防止不同账号共用设备时覆盖）
+        long boundCount = count(new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<ChatVisitor>()
+                .eq("device_fingerprint", deviceFingerprint)
+                .isNotNull("bound_user_id")
+                .ne("bound_user_id", userId));
+        if (boundCount > 0) {
+            return 0;
+        }
+        return chatVisitorMapper.bindUserIdByDeviceFingerprint(userId, deviceFingerprint, 90);
     }
 
     @Override

@@ -34,7 +34,12 @@ public interface ChatVisitorMapper extends BaseMapper<ChatVisitor> {
     ChatVisitor selectByDeviceFingerprint(@Param("deviceFingerprint") String deviceFingerprint, @Param("days") int days);
 
     /**
-     * 绑定用户ID到访客记录
+     * 绑定用户ID到访客记录（按IP）
      */
     int bindUserIdByIp(@Param("userId") Long userId, @Param("ip") String ip, @Param("days") int days);
+
+    /**
+     * 绑定用户ID到访客记录（按设备指纹）
+     */
+    int bindUserIdByDeviceFingerprint(@Param("userId") Long userId, @Param("deviceFingerprint") String deviceFingerprint, @Param("days") int days);
 }

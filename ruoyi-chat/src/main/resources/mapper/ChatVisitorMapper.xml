@@ -52,4 +52,12 @@
           AND create_time > DATE_SUB(NOW(), INTERVAL #{days} DAY)
     </update>
 
+    <update id="bindUserIdByDeviceFingerprint">
+        UPDATE chat_visitor
+        SET bound_user_id = #{userId}
+        WHERE device_fingerprint = #{deviceFingerprint}
+          AND bound_user_id IS NULL
+          AND create_time > DATE_SUB(NOW(), INTERVAL #{days} DAY)
+    </update>
+
 </mapper>
