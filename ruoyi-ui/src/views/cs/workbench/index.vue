@@ -53,9 +53,12 @@
             v-for="(msg, index) in currentMessages"
             :key="index"
             class="cs-msg"
-            :class="[msg.isSystem ? 'system' : (msg.isSelf ? 'self' : 'other')]"
+            :class="[msg.isHistoryDivider ? 'history-divider' : '', msg.isSystem ? 'system' : (msg.isSelf ? 'self' : 'other')]"
           >
-            <template v-if="msg.isSystem">
+            <template v-if="msg.isHistoryDivider">
+              <div class="cs-history-divider">{{ msg.content }}</div>
+            </template>
+            <template v-else-if="msg.isSystem">
               <div class="cs-system-bubble">{{ msg.content }}</div>
             </template>
             <template v-else>
@@ -113,7 +116,7 @@
 </template>
 
 <script>
-import { getWorkbenchSessions, closeCsSession, csOnline, csOffline, getCsSessionMessages, readCsSession, getWaitingCount } from '@/api/cs'
+import { getWorkbenchSessions, closeCsSession, csOnline, csOffline, getCsSessionMessages, readCsSession, getWaitingCount, getVisitorHistoryMessages } from '@/api/cs'
 import { WS_URL, MessageType } from '@/utils/chatConstants'
 import ChatWebSocket from '@/utils/chatWebSocket'
 import { getToken } from '@/utils/auth'
@@ -169,7 +172,7 @@ export default {
     },
     selectSession(session) {
       this.currentSessionId = session.id
-      this.loadMessages(session.id)
+      this.loadMessagesWithHistory(session.id)
       this.$set(this.unreadMap, session.id, 0)
       readCsSession(session.id)
     },
@@ -192,6 +195,59 @@ export default {
         if (setCurrent) this.currentMessages = mapped
       }).catch(() => {
         if (setCurrent) this.currentMessages = []
+      })
+    },
+    loadMessagesWithHistory(sessionId) {
+      const cached = this.messageMap[sessionId]
+      if (cached && cached.length > 0 && cached.some(m => m.isHistoryDivider)) {
+        this.currentMessages = cached
+        return
+      }
+      const session = this.activeSessions.find(s => s.id === sessionId)
+      getCsSessionMessages(sessionId).then(res => {
+        const list = res.data || []
+        const currentMapped = list.map(item => ({
+          sender: item.fromType === 2 ? '我' : (item.fromType === 1 ? '访客' : '系统'),
+          content: item.content,
+          time: this.formatTime(item.createTime),
+          isSelf: item.fromType === 2,
+          isSystem: item.fromType === 3
+        }))
+        if (!session || !session.visitorId) {
+          this.$set(this.messageMap, sessionId, currentMapped)
+          this.currentMessages = currentMapped
+          this.scrollToBottom()
+          return
+        }
+        getVisitorHistoryMessages(session.visitorId).then(histRes => {
+          const histList = histRes.data || []
+          const histMapped = histList
+            .filter(item => item.sessionId !== sessionId)
+            .map(item => ({
+              sender: item.fromType === 2 ? '客服' : (item.fromType === 1 ? '访客' : '系统'),
+              content: item.content,
+              time: this.formatTime(item.createTime),
+              isSelf: item.fromType === 2,
+              isSystem: item.fromType === 3,
+              isHistory: true
+            }))
+          const merged = []
+          if (histMapped.length > 0) {
+            merged.push({ isHistoryDivider: true, content: '—— 以下为历史会话消息 ——' })
+            merged.push(...histMapped)
+            merged.push({ isHistoryDivider: true, content: '—— 以上历史会话消息 ——' })
+          }
+          merged.push(...currentMapped)
+          this.$set(this.messageMap, sessionId, merged)
+          this.currentMessages = merged
+          this.scrollToBottom()
+        }).catch(() => {
+          this.$set(this.messageMap, sessionId, currentMapped)
+          this.currentMessages = currentMapped
+          this.scrollToBottom()
+        })
+      }).catch(() => {
+        this.currentMessages = []
       })
     },
     sendMessage() {
@@ -651,6 +707,19 @@ export default {
   font-size: 12px;
   max-width: 70%;
   text-align: center;
+}
+.cs-msg.history-divider {
+  justify-content: center;
+  align-items: center;
+  margin: 20px 0;
+}
+.cs-history-divider {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 12px;
+  background: #e4e7ed;
+  color: #909399;
+  font-size: 12px;
 }
 .cs-chat-input {
   padding: 12px 20px;

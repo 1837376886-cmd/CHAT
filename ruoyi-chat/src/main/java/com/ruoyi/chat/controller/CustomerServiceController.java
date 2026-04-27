@@ -298,6 +298,24 @@ public class CustomerServiceController {
     }
 
     /**
+     * 客服查看访客的所有历史消息
+     */
+    @GetMapping("/visitor/{visitorId}/messages")
+    public AjaxResult getVisitorHistoryMessages(@PathVariable Long visitorId) {
+        SysUser user = SecurityUtils.getLoginUser().getUser();
+        if (!Integer.valueOf(1).equals(user.getIsCustomerService())) {
+            return AjaxResult.error("无权访问");
+        }
+        // 校验该访客是否有进行中的会话属于当前客服
+        CsSession activeSession = csSessionService.selectActiveSessionByVisitorId(visitorId);
+        if (activeSession == null || !activeSession.getCsUserId().equals(user.getUserId())) {
+            return AjaxResult.error("无权查看");
+        }
+        List<CsMessage> messages = csMessageService.selectMessagesByVisitorId(visitorId);
+        return AjaxResult.success(messages);
+    }
+
+    /**
      * 客服发送消息
      */
     @PostMapping("/cs/message/send")

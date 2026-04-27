@@ -116,3 +116,10 @@ export function getWaitingCount() {
     method: 'get'
   })
 }
+
+export function getVisitorHistoryMessages(visitorId) {
+  return request({
+    url: `/cs/visitor/${visitorId}/messages`,
+    method: 'get'
+  })
+}

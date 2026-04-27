@@ -40,4 +40,9 @@ public class CsMessageServiceImpl extends ServiceImpl<CsMessageMapper, CsMessage
     public List<CsMessage> selectMessagesBySessionId(Long sessionId) {
         return csMessageMapper.selectMessagesBySessionId(sessionId);
     }
+
+    @Override
+    public List<CsMessage> selectMessagesByVisitorId(Long visitorId) {
+        return csMessageMapper.selectMessagesByVisitorId(visitorId);
+    }
 }

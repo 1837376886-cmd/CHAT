@@ -18,4 +18,11 @@
         ORDER BY create_time ASC
     </select>
 
+    <select id="selectMessagesByVisitorId" resultMap="BaseResultMap">
+        SELECT m.* FROM cs_message m
+        INNER JOIN cs_session s ON m.session_id = s.id
+        WHERE s.visitor_id = #{visitorId}
+        ORDER BY m.create_time ASC
+    </select>
+
 </mapper>

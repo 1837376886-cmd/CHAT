@@ -26,4 +26,9 @@ public interface ICsMessageService extends IService<CsMessage> {
      * 查询会话消息列表
      */
     List<CsMessage> selectMessagesBySessionId(Long sessionId);
+
+    /**
+     * 根据访客ID查询所有历史消息
+     */
+    List<CsMessage> selectMessagesByVisitorId(Long visitorId);
 }

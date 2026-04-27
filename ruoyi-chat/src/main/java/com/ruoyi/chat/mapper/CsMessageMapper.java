@@ -17,4 +17,9 @@ public interface CsMessageMapper extends BaseMapper<CsMessage> {
      * 根据会话ID查询消息列表
      */
     List<CsMessage> selectMessagesBySessionId(@Param("sessionId") Long sessionId);
+
+    /**
+     * 根据访客ID查询所有会话消息（历史消息）
+     */
+    List<CsMessage> selectMessagesByVisitorId(@Param("visitorId") Long visitorId);
 }
