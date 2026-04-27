@@ -58,6 +58,7 @@
     <div class="el-login-footer">
       <span>Copyright © 2018-2025 ruoyi.vip All Rights Reserved.</span>
     </div>
+    <GuestChatWidget />
   </div>
 </template>
 
@@ -65,9 +66,13 @@
 import { getCodeImg } from "@/api/login"
 import Cookies from "js-cookie"
 import { encrypt, decrypt } from '@/utils/jsencrypt'
+import GuestChatWidget from '@/components/CustomerService/GuestChatWidget'
 
 export default {
   name: "Login",
+  components: {
+    GuestChatWidget
+  },
   data() {
     return {
       title: process.env.VUE_APP_TITLE,

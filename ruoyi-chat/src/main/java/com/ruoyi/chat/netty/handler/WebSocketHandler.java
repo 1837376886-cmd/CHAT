@@ -1,14 +1,20 @@
 package com.ruoyi.chat.netty.handler;
 
 import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSON;
+import com.ruoyi.chat.domain.entity.ChatVisitor;
+import com.ruoyi.chat.domain.entity.CsConfig;
+import com.ruoyi.chat.domain.entity.CsMessage;
+import com.ruoyi.chat.domain.entity.CsSession;
 import com.ruoyi.chat.protocol.ChatMessage;
 import com.ruoyi.chat.protocol.ContentType;
 import com.ruoyi.chat.protocol.MessageType;
 import com.ruoyi.chat.netty.manager.ConnectionManager;
 import com.ruoyi.chat.netty.router.MessageRouter;
 import com.ruoyi.chat.netty.session.UserSession;
-import com.ruoyi.chat.service.IChatMessageService;
-import com.ruoyi.chat.service.IChatSessionService;
+import com.ruoyi.chat.service.*;
+import com.ruoyi.common.core.domain.entity.SysUser;
+import com.ruoyi.system.service.ISysUserService;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
@@ -19,6 +25,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.Date;
+import java.util.Map;
 
 /**
  * WebSocket消息处理器
@@ -42,6 +49,24 @@ public class WebSocketHandler extends SimpleChannelInboundHandler<WebSocketFrame
     @Autowired
     private IChatSessionService chatSessionService;
 
+    @Autowired
+    private IChatVisitorService chatVisitorService;
+
+    @Autowired
+    private ICsSessionService csSessionService;
+
+    @Autowired
+    private ICsMessageService csMessageService;
+
+    @Autowired
+    private CustomerServiceRedisManager redisManager;
+
+    @Autowired
+    private ISysUserService sysUserService;
+
+    @Autowired
+    private ICsConfigService csConfigService;
+
     @Override
     public void channelActive(ChannelHandlerContext ctx) throws Exception {
         logger.debug("WebSocket连接建立: {}", ctx.channel().id());
@@ -55,8 +80,14 @@ public class WebSocketHandler extends SimpleChannelInboundHandler<WebSocketFrame
         // 获取用户会话信息
         UserSession userSession = connectionManager.getUserSessionByChannel(ctx.channel().id());
         if (userSession != null) {
+            Long userId = userSession.getUserId();
+            SysUser user = sysUserService.selectUserById(userId);
+            if (user != null && Integer.valueOf(1).equals(user.getIsCustomerService())) {
+                redisManager.setCsStatus(userId, "offline", redisManager.getMaxSessions(userId));
+                logger.info("客服下线: {} ({})", userSession.getUserNickname(), userId);
+            }
             // 发送用户下线通知
-            messageRouter.sendUserStatusNotification(userSession.getUserId(), "offline");
+            messageRouter.sendUserStatusNotification(userId, "offline");
         }
         
         // 移除连接
@@ -93,9 +124,15 @@ public class WebSocketHandler extends SimpleChannelInboundHandler<WebSocketFrame
                 case AUTH:
                     handleAuthMessage(ctx, message);
                     break;
+                case GUEST_AUTH:
+                    handleGuestAuthMessage(ctx, message);
+                    break;
                 case PRIVATE_CHAT:
                 case GROUP_CHAT:
                     handleChatMessage(ctx, message);
+                    break;
+                case CS_CHAT:
+                    handleCsChatMessage(ctx, message);
                     break;
                 case HEARTBEAT:
                     handleHeartbeat(ctx, message);
@@ -134,13 +171,177 @@ public class WebSocketHandler extends SimpleChannelInboundHandler<WebSocketFrame
             
             ctx.channel().writeAndFlush(new TextWebSocketFrame(JSON.toJSONString(authResponse)));
             
+            // 客服自动上线
+            SysUser user = sysUserService.selectUserById(userId);
+            if (user != null && Integer.valueOf(1).equals(user.getIsCustomerService())) {
+                int maxSessions = 5;
+                try {
+                    CsConfig config = csConfigService.getOrCreateDefault(userId);
+                    if (config != null && config.getMaxSessions() != null) {
+                        maxSessions = config.getMaxSessions();
+                    }
+                } catch (Exception e) {
+                    logger.warn("获取客服配置失败，使用默认值: {}", e.getMessage());
+                }
+                redisManager.setCsStatus(userId, "online", maxSessions);
+                logger.info("客服上线: {} ({})", userNickname, userId);
+            }
+
             // 发送用户上线通知
             messageRouter.sendUserStatusNotification(userId, "online");
-            
+
             logger.info("用户认证成功: {} ({})", userNickname, userId);
         } catch (Exception e) {
             logger.error("处理认证消息失败: {}", e.getMessage(), e);
             sendErrorResponse(ctx, "认证失败");
+        }
+    }
+
+    /**
+     * 处理访客认证消息
+     */
+    private void handleGuestAuthMessage(ChannelHandlerContext ctx, ChatMessage message) {
+        try {
+            String visitorToken = message.getVisitorToken();
+            if (visitorToken == null || visitorToken.isEmpty()) {
+                logger.warn("访客认证消息缺少 visitorToken");
+                sendErrorResponse(ctx, "认证失败：缺少访客Token");
+                return;
+            }
+
+            ChatVisitor visitor = chatVisitorService.selectByVisitorToken(visitorToken);
+            if (visitor == null) {
+                logger.warn("访客Token无效: {}", visitorToken);
+                sendErrorResponse(ctx, "认证失败：访客不存在");
+                return;
+            }
+
+            connectionManager.addVisitorConnection(visitorToken, ctx.channel(), visitor.getNickname());
+
+            ChatMessage authResponse = new ChatMessage();
+            authResponse.setType(MessageType.AUTH_SUCCESS);
+            authResponse.setContent("访客认证成功");
+            authResponse.setTimestamp(new Date());
+
+            ctx.channel().writeAndFlush(new TextWebSocketFrame(JSON.toJSONString(authResponse)));
+            logger.info("访客认证成功: {} ({})", visitor.getNickname(), visitorToken);
+        } catch (Exception e) {
+            logger.error("处理访客认证消息失败: {}", e.getMessage(), e);
+            sendErrorResponse(ctx, "访客认证失败");
+        }
+    }
+
+    /**
+     * 处理客服聊天消息
+     */
+    private void handleCsChatMessage(ChannelHandlerContext ctx, ChatMessage message) {
+        try {
+            Long sessionId = null;
+            if (message.getSessionId() != null) {
+                try {
+                    sessionId = Long.valueOf(message.getSessionId());
+                } catch (NumberFormatException e) {
+                    logger.warn("无效的客服会话ID: {}", message.getSessionId());
+                    sendErrorResponse(ctx, "无效的会话ID");
+                    return;
+                }
+            }
+
+            if (sessionId == null) {
+                logger.warn("CS_CHAT缺少会话ID, message={}", message.getMessageId());
+                sendErrorResponse(ctx, "缺少会话ID");
+                return;
+            }
+
+            CsSession session = csSessionService.getById(sessionId);
+            if (session == null) {
+                logger.warn("CS_CHAT会话不存在, sessionId={}", sessionId);
+                sendErrorResponse(ctx, "会话不存在或已结束");
+                return;
+            }
+            if (!Integer.valueOf(CsSession.Status.ACTIVE).equals(session.getStatus())) {
+                logger.warn("CS_CHAT会话状态非ACTIVE, sessionId={}, status={}", sessionId, session.getStatus());
+                sendErrorResponse(ctx, "会话不存在或已结束");
+                return;
+            }
+
+            // 判断发送者身份
+            UserSession userSession = connectionManager.getUserSessionByChannel(ctx.channel().id());
+            boolean isCs = false;
+            Long senderUserId = null;
+            String senderNickname = null;
+
+            if (userSession != null && userSession.getUserId() != null) {
+                // 已登录用户（客服）
+                senderUserId = userSession.getUserId();
+                senderNickname = userSession.getUserNickname();
+                if (session.getCsUserId().equals(senderUserId)) {
+                    isCs = true;
+                } else {
+                    logger.warn("CS_CHAT客服无权发送, sessionId={}, senderUserId={}", sessionId, senderUserId);
+                    sendErrorResponse(ctx, "无权发送消息到此会话");
+                    return;
+                }
+            } else {
+                // 访客
+                String visitorToken = connectionManager.getVisitorTokenByChannel(ctx.channel().id());
+                logger.info("CS_CHAT访客发送, sessionId={}, visitorToken={}", sessionId, visitorToken);
+                ChatVisitor visitor = chatVisitorService.selectByVisitorToken(visitorToken);
+                if (visitor == null) {
+                    logger.warn("CS_CHAT访客不存在, visitorToken={}", visitorToken);
+                    sendErrorResponse(ctx, "无权发送消息到此会话");
+                    return;
+                }
+                if (!visitor.getId().equals(session.getVisitorId())) {
+                    logger.warn("CS_CHAT访客ID不匹配, visitorId={}, sessionVisitorId={}", visitor.getId(), session.getVisitorId());
+                    sendErrorResponse(ctx, "无权发送消息到此会话");
+                    return;
+                }
+                senderNickname = visitor.getNickname();
+            }
+
+            // 保存消息
+            int fromType = isCs ? CsMessage.FromType.CS : CsMessage.FromType.VISITOR;
+            csMessageService.sendMessage(sessionId, fromType, senderUserId, message.getContent());
+            logger.info("CS_CHAT消息已保存, sessionId={}, fromType={}, isCs={}", sessionId, fromType, isCs);
+
+            // 构造推送消息
+            ChatMessage pushMsg = new ChatMessage();
+            pushMsg.setType(MessageType.CS_CHAT);
+            pushMsg.setSessionId(String.valueOf(sessionId));
+            pushMsg.setContent(message.getContent());
+            pushMsg.setFromUserId(senderUserId);
+            pushMsg.setFromUserNickname(senderNickname);
+            pushMsg.setTimestamp(new Date());
+
+            String pushJson = JSON.toJSONString(pushMsg);
+
+            // 推送给接收方
+            if (isCs) {
+                // 客服发给访客，推送给访客
+                ChatVisitor visitor = chatVisitorService.getById(session.getVisitorId());
+                if (visitor != null) {
+                    boolean sent = connectionManager.sendMessageToVisitor(visitor.getVisitorToken(),
+                            new TextWebSocketFrame(pushJson));
+                    logger.info("CS_CHAT客服->访客推送结果, sent={}", sent);
+                }
+            } else {
+                // 访客发给客服，推送给客服
+                boolean sent = connectionManager.sendMessageToUser(session.getCsUserId(),
+                        new TextWebSocketFrame(pushJson));
+                logger.info("CS_CHAT访客->客服推送结果, csUserId={}, sent={}", session.getCsUserId(), sent);
+            }
+
+            // 发送确认
+            ChatMessage ack = new ChatMessage();
+            ack.setType(MessageType.AUTH_SUCCESS);
+            ack.setMessageId(message.getMessageId());
+            ack.setTimestamp(new Date());
+            ctx.channel().writeAndFlush(new TextWebSocketFrame(JSON.toJSONString(ack)));
+
+        } catch (Exception e) {
+            logger.error("处理客服消息失败: {}", e.getMessage(), e);
+            sendErrorResponse(ctx, "消息发送失败");
         }
     }
 

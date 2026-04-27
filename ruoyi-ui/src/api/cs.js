@@ -1,0 +1,89 @@
+import request from '@/utils/request'
+
+export function csConnect(data) {
+  return request({
+    url: '/cs/connect',
+    method: 'post',
+    data: data
+  })
+}
+
+export function csSendMessage(data) {
+  return request({
+    url: '/cs/cs/message/send',
+    method: 'post',
+    data: data
+  })
+}
+
+export function getCsSessionHistory(sessionId, visitorToken) {
+  return request({
+    url: `/cs/session/history/${sessionId}`,
+    method: 'get',
+    params: { visitorToken }
+  })
+}
+
+export function getCsSessionMessages(sessionId) {
+  return request({
+    url: `/cs/session/${sessionId}/messages`,
+    method: 'get'
+  })
+}
+
+export function getWorkbenchSessions() {
+  return request({
+    url: '/cs/workbench/sessions',
+    method: 'get'
+  })
+}
+
+export function closeCsSession(sessionId) {
+  return request({
+    url: `/cs/session/close/${sessionId}`,
+    method: 'post'
+  })
+}
+
+export function csStaffList() {
+  return request({
+    url: '/cs/staff/list',
+    method: 'get'
+  })
+}
+
+export function setCsStaff(data) {
+  return request({
+    url: '/cs/staff/set',
+    method: 'post',
+    data: data
+  })
+}
+
+export function getMyCsHistory() {
+  return request({
+    url: '/cs/my/history',
+    method: 'get'
+  })
+}
+
+export function confirmBindHistory() {
+  return request({
+    url: '/cs/bind/confirm',
+    method: 'post'
+  })
+}
+
+export function csOnline() {
+  return request({
+    url: '/cs/online',
+    method: 'post'
+  })
+}
+
+export function csOffline() {
+  return request({
+    url: '/cs/offline',
+    method: 'post'
+  })
+}

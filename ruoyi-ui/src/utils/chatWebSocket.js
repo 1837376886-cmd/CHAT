@@ -34,9 +34,13 @@ class ChatWebSocket {
             };
 
             this.ws.onmessage = (event) => {
-                const message = JSON.parse(event.data);
-                console.log('=== 收到消息 ===', message);
-                this.onMessage(message);
+                try {
+                    const message = JSON.parse(event.data);
+                    console.log('=== 收到消息 ===', message);
+                    this.onMessage(message);
+                } catch (e) {
+                    console.error('=== 收到无法解析的消息 ===', event.data, e);
+                }
             };
 
             this.ws.onclose = (event) => {

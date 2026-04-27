@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mvn compile *)",
+      "Bash(where mvn *)",
+      "Bash(where mvn.cmd)",
+      "Bash(dir /s /b \"C:\\\\apache-maven*\\\\bin\\\\mvn.cmd\")",
+      "Bash(java -version)",
+      "Bash(\"/c/Program Files/apache-maven-3.8.4/bin/mvn\" compile -pl ruoyi-chat,ruoyi-admin,ruoyi-system,ruoyi-common,ruoyi-framework -am --batch-mode)",
+      "Bash(ls -d /c/Program*)",
+      "Read(//c//**)",
+      "Read(//c/Program Files/apache-maven-3.8.4/**)",
+      "Read(//c/Program Files \\(x86\\)/apache-maven-3.8.4/**)",
+      "Bash(find /c -maxdepth 3 -name \"mvn.cmd\")",
+      "Bash(\"/c/maven/apache-maven-3.8.4/bin/mvn\" compile *)",
+      "Bash(mvn clean *)",
+      "Bash(/c/maven/apache-maven-3.8.4/bin/mvn clean *)",
+      "Bash(npm run *)"
+    ]
+  }
+}

@@ -1,0 +1,408 @@
+<template>
+  <div class="guest-cs-widget">
+    <!-- 悬浮按钮 -->
+    <div v-if="!isOpen" class="cs-float-btn" @click="openChat">
+      <i class="el-icon-service"></i>
+      <span class="cs-label">客服咨询</span>
+    </div>
+
+    <!-- 聊天窗口 -->
+    <div v-else class="cs-chat-window">
+      <div class="cs-chat-header">
+        <div class="cs-header-info">
+          <span class="cs-title">在线客服</span>
+          <span v-if="csNickname" class="cs-subtitle">{{ csNickname }}</span>
+          <span v-else-if="waiting" class="cs-status waiting">等待中...</span>
+          <span v-else-if="waitingForLastCs" class="cs-status waiting">联系上次客服中...</span>
+        </div>
+        <i class="el-icon-close cs-close" @click="closeChat"></i>
+      </div>
+
+      <div class="cs-chat-body" ref="messageContainer">
+        <div v-if="messages.length === 0" class="cs-empty-tip">
+          <p>欢迎使用在线客服</p>
+          <p v-if="waiting || waitingForLastCs">{{ statusMessage }}</p>
+        </div>
+        <div
+          v-for="(msg, index) in messages"
+          :key="index"
+          class="cs-message"
+          :class="msg.isSelf ? 'self' : 'other'"
+        >
+          <div class="cs-msg-bubble">
+            <div class="cs-msg-sender">{{ msg.sender }}</div>
+            <div class="cs-msg-content">{{ msg.content }}</div>
+            <div class="cs-msg-time">{{ msg.time }}</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="cs-chat-footer">
+        <el-input
+          v-model="inputMessage"
+          type="textarea"
+          :rows="2"
+          placeholder="请输入您的问题..."
+          :disabled="inputDisabled"
+          @keyup.enter.native="handleSend"
+        />
+        <el-button
+          type="primary"
+          size="small"
+          :disabled="inputDisabled || !inputMessage.trim()"
+          @click="handleSend"
+        >
+          发送
+        </el-button>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script>
+import { csConnect, getCsSessionHistory } from '@/api/cs'
+import { WS_URL, MessageType } from '@/utils/chatConstants'
+import ChatWebSocket from '@/utils/chatWebSocket'
+
+export default {
+  name: 'GuestChatWidget',
+  data() {
+    return {
+      isOpen: false,
+      visitorToken: localStorage.getItem('cs_visitor_token') || '',
+      sessionId: null,
+      csUserId: null,
+      csNickname: null,
+      waiting: false,
+      waitingForLastCs: false,
+      statusMessage: '',
+      inputMessage: '',
+      messages: [],
+      wsClient: null,
+      wsConnected: false,
+      reconnectTimer: null
+    }
+  },
+  computed: {
+    inputDisabled() {
+      return this.waiting || this.waitingForLastCs
+    }
+  },
+  beforeDestroy() {
+    if (this.wsClient) {
+      this.wsClient.close()
+    }
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer)
+    }
+  },
+  methods: {
+    async openChat() {
+      this.isOpen = true
+      if (!this.visitorToken) {
+        this.visitorToken = this.generateToken()
+        localStorage.setItem('cs_visitor_token', this.visitorToken)
+      }
+      await this.doConnect()
+    },
+    closeChat() {
+      this.isOpen = false
+    },
+    generateToken() {
+      return 'v_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9)
+    },
+    async doConnect() {
+      try {
+        const res = await csConnect({
+          visitorToken: this.visitorToken,
+          sourcePage: window.location.href
+        })
+        const data = res.data
+        this.waiting = data.waiting || false
+        this.waitingForLastCs = data.waitingForLastCs || false
+        this.statusMessage = data.message || ''
+
+        if (data.success) {
+          this.sessionId = data.sessionId
+          this.csUserId = data.csUserId
+          this.csNickname = data.csNickname
+          this.initWebSocket()
+          this.loadHistory()
+        } else if (this.waiting || this.waitingForLastCs) {
+          this.initWebSocket()
+          // 等待状态下定时重试分配
+          this.scheduleReconnect()
+        }
+      } catch (e) {
+        this.statusMessage = '连接失败，请稍后重试'
+        console.error(e)
+      }
+    },
+    scheduleReconnect() {
+      if (this.reconnectTimer) {
+        clearTimeout(this.reconnectTimer)
+      }
+      this.reconnectTimer = setTimeout(() => {
+        if (this.isOpen && !this.sessionId) {
+          this.doConnect()
+        }
+      }, 5000)
+    },
+    initWebSocket() {
+      if (this.wsClient) {
+        this.wsClient.close()
+      }
+      this.wsClient = new ChatWebSocket(WS_URL, {
+        maxReconnectAttempts: 5,
+        reconnectInterval: 3000,
+        heartbeatInterval: 20000,
+        onOpen: () => {
+          this.wsConnected = true
+          this.wsClient.send({
+            type: MessageType.GUEST_AUTH,
+            visitorToken: this.visitorToken
+          })
+        },
+        onMessage: (msg) => {
+          this.handleWsMessage(msg)
+        },
+        onClose: () => {
+          this.wsConnected = false
+        }
+      })
+    },
+    handleWsMessage(msg) {
+      if (msg.type === MessageType.AUTH_SUCCESS) {
+        console.log('访客WS认证成功')
+        return
+      }
+      if (msg.type === MessageType.CS_CHAT) {
+        this.messages.push({
+          sender: msg.fromUserNickname || '客服',
+          content: msg.content,
+          time: this.formatTime(new Date()),
+          isSelf: false
+        })
+        this.scrollToBottom()
+        return
+      }
+      if (msg.type === MessageType.SYSTEM_NOTICE) {
+        if (msg.content === '会话已结束') {
+          this.sessionId = null
+          this.csNickname = null
+          this.csUserId = null
+        }
+        this.messages.push({
+          sender: '系统',
+          content: msg.content,
+          time: this.formatTime(new Date()),
+          isSelf: false
+        })
+        this.scrollToBottom()
+      }
+      if (msg.type === MessageType.ERROR) {
+        if (msg.content === '会话不存在或已结束') {
+          this.sessionId = null
+        }
+        this.$message.error(msg.content || '发送失败')
+      }
+      if (msg.type === MessageType.AUTH_SUCCESS) {
+        console.log('访客WS认证成功')
+      }
+    },
+    async loadHistory() {
+      if (!this.sessionId) return
+      try {
+        const res = await getCsSessionHistory(this.sessionId, this.visitorToken)
+        const list = res.data || []
+        this.messages = list.map(item => ({
+          sender: item.fromType === 1 ? '我' : (item.fromType === 2 ? '客服' : '系统'),
+          content: item.content,
+          time: this.formatTime(item.createTime),
+          isSelf: item.fromType === 1
+        }))
+        this.scrollToBottom()
+      } catch (e) {
+        console.error(e)
+      }
+    },
+    async handleSend() {
+      const content = this.inputMessage.trim()
+      if (!content || this.inputDisabled) return
+
+      if (!this.sessionId) {
+        await this.doConnect()
+        if (!this.sessionId) {
+          this.$message.warning('暂时无法连接客服，请稍后重试')
+          return
+        }
+      }
+
+      if (this.wsClient && this.wsConnected) {
+        this.wsClient.send({
+          type: MessageType.CS_CHAT,
+          sessionId: String(this.sessionId),
+          visitorToken: this.visitorToken,
+          content: content,
+          messageId: 'msg_' + Date.now()
+        })
+      }
+
+      this.messages.push({
+        sender: '我',
+        content: content,
+        time: this.formatTime(new Date()),
+        isSelf: true
+      })
+      this.inputMessage = ''
+      this.scrollToBottom()
+    },
+    scrollToBottom() {
+      this.$nextTick(() => {
+        const container = this.$refs.messageContainer
+        if (container) {
+          container.scrollTop = container.scrollHeight
+        }
+      })
+    },
+    formatTime(timeStr) {
+      if (!timeStr) return ''
+      const d = new Date(timeStr)
+      const h = String(d.getHours()).padStart(2, '0')
+      const m = String(d.getMinutes()).padStart(2, '0')
+      return `${h}:${m}`
+    }
+  }
+}
+</script>
+
+<style scoped>
+.guest-cs-widget {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 9999;
+}
+.cs-float-btn {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: #409eff;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.4);
+  transition: all 0.3s;
+}
+.cs-float-btn:hover {
+  transform: scale(1.05);
+}
+.cs-float-btn i {
+  font-size: 24px;
+}
+.cs-label {
+  font-size: 10px;
+  margin-top: 2px;
+}
+.cs-chat-window {
+  width: 360px;
+  height: 500px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.cs-chat-header {
+  padding: 12px 16px;
+  background: #409eff;
+  color: #fff;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.cs-title {
+  font-weight: bold;
+  font-size: 16px;
+}
+.cs-subtitle {
+  margin-left: 8px;
+  font-size: 12px;
+  opacity: 0.9;
+}
+.cs-status {
+  margin-left: 8px;
+  font-size: 12px;
+}
+.cs-status.waiting {
+  color: #ffe58f;
+}
+.cs-close {
+  cursor: pointer;
+  font-size: 18px;
+}
+.cs-chat-body {
+  flex: 1;
+  padding: 12px;
+  overflow-y: auto;
+  background: #f5f5f5;
+}
+.cs-empty-tip {
+  text-align: center;
+  color: #999;
+  margin-top: 40px;
+}
+.cs-message {
+  margin-bottom: 12px;
+  display: flex;
+}
+.cs-message.self {
+  justify-content: flex-end;
+}
+.cs-message.other {
+  justify-content: flex-start;
+}
+.cs-msg-bubble {
+  max-width: 70%;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #fff;
+  word-break: break-word;
+}
+.cs-message.self .cs-msg-bubble {
+  background: #409eff;
+  color: #fff;
+}
+.cs-msg-sender {
+  font-size: 12px;
+  color: #999;
+  margin-bottom: 4px;
+}
+.cs-message.self .cs-msg-sender {
+  color: rgba(255,255,255,0.8);
+}
+.cs-msg-content {
+  font-size: 14px;
+  line-height: 1.5;
+}
+.cs-msg-time {
+  font-size: 10px;
+  color: #ccc;
+  margin-top: 4px;
+  text-align: right;
+}
+.cs-chat-footer {
+  padding: 8px;
+  border-top: 1px solid #ebeef5;
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+.cs-chat-footer .el-textarea {
+  flex: 1;
+}
+</style>

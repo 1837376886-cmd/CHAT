@@ -59,6 +59,9 @@ public class SysUser extends BaseEntity
     @Excel(name = "账号状态", readConverterExp = "0=正常,1=停用")
     private String status;
 
+    /** 是否客服（0否 1是） */
+    private Integer isCustomerService;
+
     /** 删除标志（0代表存在 2代表删除） */
     private String delFlag;
 
@@ -220,6 +223,16 @@ public class SysUser extends BaseEntity
         this.status = status;
     }
 
+    public Integer getIsCustomerService()
+    {
+        return isCustomerService;
+    }
+
+    public void setIsCustomerService(Integer isCustomerService)
+    {
+        this.isCustomerService = isCustomerService;
+    }
+
     public String getDelFlag()
     {
         return delFlag;
@@ -323,6 +336,7 @@ public class SysUser extends BaseEntity
             .append("avatar", getAvatar())
             .append("password", getPassword())
             .append("status", getStatus())
+            .append("isCustomerService", getIsCustomerService())
             .append("delFlag", getDelFlag())
             .append("loginIp", getLoginIp())
             .append("loginDate", getLoginDate())

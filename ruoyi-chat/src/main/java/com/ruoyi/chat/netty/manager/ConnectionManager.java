@@ -40,6 +40,16 @@ public class ConnectionManager {
     private final ConcurrentMap<ChannelId, Long> channelUserMap = new ConcurrentHashMap<>();
 
     /**
+     * 访客Token -> 访客会话映射
+     */
+    private final ConcurrentMap<String, UserSession> visitorSessions = new ConcurrentHashMap<>();
+
+    /**
+     * 通道ID -> 访客Token映射
+     */
+    private final ConcurrentMap<ChannelId, String> channelVisitorMap = new ConcurrentHashMap<>();
+
+    /**
      * 添加用户连接
      *
      * @param userId 用户ID
@@ -69,18 +79,60 @@ public class ConnectionManager {
     }
 
     /**
+     * 添加访客连接
+     */
+    public void addVisitorConnection(String visitorToken, Channel channel, String nickname) {
+        UserSession existingSession = visitorSessions.get(visitorToken);
+        if (existingSession != null) {
+            removeVisitorConnection(existingSession.getChannel().id());
+        }
+
+        UserSession session = new UserSession();
+        session.setUserNickname(nickname);
+        session.setChannel(channel);
+        session.setChannelId(channel.id());
+
+        channel.attr(USER_SESSION_KEY).set(session);
+        visitorSessions.put(visitorToken, session);
+        channelVisitorMap.put(channel.id(), visitorToken);
+
+        logger.info("访客 {} 连接成功，当前在线访客数: {}", nickname, visitorSessions.size());
+    }
+
+    /**
      * 移除用户连接
      *
      * @param channelId 通道ID
      */
     public void removeConnection(ChannelId channelId) {
+        // 先尝试移除访客连接
+        String visitorToken = channelVisitorMap.remove(channelId);
+        if (visitorToken != null) {
+            UserSession visitorSession = visitorSessions.remove(visitorToken);
+            if (visitorSession != null) {
+                logger.info("访客 {} 断开连接，当前在线访客数: {}",
+                        visitorToken, visitorSessions.size());
+            }
+            return;
+        }
+
         Long userId = channelUserMap.remove(channelId);
         if (userId != null) {
             UserSession userSession = userSessions.remove(userId);
             if (userSession != null) {
-                logger.info("用户 {} ({}) 断开连接，当前在线用户数: {}", 
+                logger.info("用户 {} ({}) 断开连接，当前在线用户数: {}",
                     userSession.getUserNickname(), userId, userSessions.size());
             }
+        }
+    }
+
+    /**
+     * 移除访客连接
+     */
+    public void removeVisitorConnection(ChannelId channelId) {
+        String visitorToken = channelVisitorMap.remove(channelId);
+        if (visitorToken != null) {
+            visitorSessions.remove(visitorToken);
         }
     }
 
@@ -95,6 +147,20 @@ public class ConnectionManager {
     }
 
     /**
+     * 根据访客Token获取访客会话
+     */
+    public UserSession getVisitorSession(String visitorToken) {
+        return visitorSessions.get(visitorToken);
+    }
+
+    /**
+     * 根据通道ID获取访客Token
+     */
+    public String getVisitorTokenByChannel(ChannelId channelId) {
+        return channelVisitorMap.get(channelId);
+    }
+
+    /**
      * 根据通道ID获取用户会话
      *
      * @param channelId 通道ID
@@ -102,7 +168,14 @@ public class ConnectionManager {
      */
     public UserSession getUserSessionByChannel(ChannelId channelId) {
         Long userId = channelUserMap.get(channelId);
-        return userId != null ? userSessions.get(userId) : null;
+        if (userId != null) {
+            return userSessions.get(userId);
+        }
+        String visitorToken = channelVisitorMap.get(channelId);
+        if (visitorToken != null) {
+            return visitorSessions.get(visitorToken);
+        }
+        return null;
     }
 
     /**
@@ -154,6 +227,22 @@ public class ConnectionManager {
      */
     public boolean sendMessageToUser(Long userId, Object message) {
         UserSession session = getUserSession(userId);
+        if (session != null && session.getChannel().isActive()) {
+            session.getChannel().writeAndFlush(message);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * 向指定访客发送消息
+     *
+     * @param visitorToken 访客Token
+     * @param message 消息内容
+     * @return 是否发送成功
+     */
+    public boolean sendMessageToVisitor(String visitorToken, Object message) {
+        UserSession session = getVisitorSession(visitorToken);
         if (session != null && session.getChannel().isActive()) {
             session.getChannel().writeAndFlush(message);
             return true;

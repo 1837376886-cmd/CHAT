@@ -44,6 +44,9 @@ public class ChatMessage {
     @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", timezone = "UTC")
     private Date timestamp;
     
+    /** 访客Token */
+    private String visitorToken;
+
     /** 额外数据 */
     private Object extra;
 
@@ -144,6 +147,14 @@ public class ChatMessage {
 
     public void setExtra(Object extra) {
         this.extra = extra;
+    }
+
+    public String getVisitorToken() {
+        return visitorToken;
+    }
+
+    public void setVisitorToken(String visitorToken) {
+        this.visitorToken = visitorToken;
     }
 
     /**

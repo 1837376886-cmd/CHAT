@@ -8,7 +8,10 @@ package com.ruoyi.chat.protocol;
 public enum MessageType {
     /** 连接认证 */
     AUTH,
-    
+
+    /** 访客认证 */
+    GUEST_AUTH,
+
     /** 认证成功 */
     AUTH_SUCCESS,
     
@@ -20,7 +23,10 @@ public enum MessageType {
     
     /** 群聊消息 */
     GROUP_CHAT,
-    
+
+    /** 客服消息 */
+    CS_CHAT,
+
     /** 心跳包 */
     HEARTBEAT,
     

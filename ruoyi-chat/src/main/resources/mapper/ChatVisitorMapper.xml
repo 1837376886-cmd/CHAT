@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.chat.mapper.ChatVisitorMapper">
+
+    <resultMap id="BaseResultMap" type="com.ruoyi.chat.domain.entity.ChatVisitor">
+        <id column="id" property="id" jdbcType="BIGINT"/>
+        <result column="visitor_token" property="visitorToken" jdbcType="VARCHAR"/>
+        <result column="nickname" property="nickname" jdbcType="VARCHAR"/>
+        <result column="ip" property="ip" jdbcType="VARCHAR"/>
+        <result column="user_agent" property="userAgent" jdbcType="VARCHAR"/>
+        <result column="source_page" property="sourcePage" jdbcType="VARCHAR"/>
+        <result column="bound_user_id" property="boundUserId" jdbcType="BIGINT"/>
+        <result column="last_cs_user_id" property="lastCsUserId" jdbcType="BIGINT"/>
+        <result column="last_session_end_time" property="lastSessionEndTime" jdbcType="TIMESTAMP"/>
+        <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
+    </resultMap>
+
+    <select id="selectByVisitorToken" resultMap="BaseResultMap">
+        SELECT * FROM chat_visitor WHERE visitor_token = #{visitorToken} LIMIT 1
+    </select>
+
+    <select id="selectByIpAndUnbound" resultMap="BaseResultMap">
+        SELECT * FROM chat_visitor
+        WHERE ip = #{ip}
+          AND bound_user_id IS NULL
+          AND create_time > DATE_SUB(NOW(), INTERVAL #{days} DAY)
+        ORDER BY create_time DESC
+    </select>
+
+    <update id="bindUserIdByIp">
+        UPDATE chat_visitor
+        SET bound_user_id = #{userId}
+        WHERE ip = #{ip}
+          AND bound_user_id IS NULL
+          AND create_time > DATE_SUB(NOW(), INTERVAL #{days} DAY)
+    </update>
+
+</mapper>
