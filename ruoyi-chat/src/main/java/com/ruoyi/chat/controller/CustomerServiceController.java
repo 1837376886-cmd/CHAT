@@ -296,6 +296,22 @@ public class CustomerServiceController {
     }
 
     /**
+     * 获取当前客服状态
+     */
+    @GetMapping("/my/status")
+    public AjaxResult getMyStatus() {
+        SysUser user = SecurityUtils.getLoginUser().getUser();
+        if (!Integer.valueOf(1).equals(user.getIsCustomerService())) {
+            return AjaxResult.error("无权访问");
+        }
+        Map<String, Object> data = new HashMap<>();
+        data.put("online", "online".equals(redisManager.getCsStatus(user.getUserId())));
+        data.put("activeCount", redisManager.getActiveCount(user.getUserId()));
+        data.put("maxSessions", redisManager.getMaxSessions(user.getUserId()));
+        return AjaxResult.success(data);
+    }
+
+    /**
      * 客服加载会话历史消息
      */
     @GetMapping("/session/{sessionId}/messages")

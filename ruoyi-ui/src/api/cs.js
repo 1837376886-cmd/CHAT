@@ -132,6 +132,13 @@ export function getWaitingCount() {
   })
 }
 
+export function getMyCsStatus() {
+  return request({
+    url: '/cs/my/status',
+    method: 'get'
+  })
+}
+
 export function getVisitorHistoryMessages(visitorId) {
   return request({
     url: `/cs/visitor/${visitorId}/messages`,

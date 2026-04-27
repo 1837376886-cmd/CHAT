@@ -116,7 +116,7 @@
 </template>
 
 <script>
-import { getWorkbenchSessions, closeCsSession, csOnline, csOffline, getCsSessionMessages, readCsSession, getWaitingCount, getVisitorHistoryMessages } from '@/api/cs'
+import { getWorkbenchSessions, closeCsSession, csOnline, csOffline, getCsSessionMessages, readCsSession, getWaitingCount, getVisitorHistoryMessages, getMyCsStatus } from '@/api/cs'
 import { WS_URL, MessageType } from '@/utils/chatConstants'
 import ChatWebSocket from '@/utils/chatWebSocket'
 import { getToken } from '@/utils/auth'
@@ -144,6 +144,7 @@ export default {
     }
   },
   mounted() {
+    this.loadMyStatus()
     this.loadSessions()
     this.initWebSocket()
     this.startWaitingPoll()
@@ -157,6 +158,15 @@ export default {
     }
   },
   methods: {
+    loadMyStatus() {
+      getMyCsStatus().then(res => {
+        const data = res.data || {}
+        this.online = !!data.online
+        this.maxSessions = data.maxSessions || 5
+      }).catch(() => {
+        this.online = false
+      })
+    },
     loadSessions() {
       getWorkbenchSessions().then(res => {
         this.activeSessions = res.data || []
