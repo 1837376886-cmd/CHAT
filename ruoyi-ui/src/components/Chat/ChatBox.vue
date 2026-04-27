@@ -383,6 +383,10 @@ export default {
       }
 
       const messageContent = this.inputMessage.trim();
+      const isEmojiOnly = this.isPureEmoji(messageContent);
+      const messageType = isEmojiOnly ? 3 : 1;
+      const contentType = isEmojiOnly ? ContentType.EMOJI : ContentType.TEXT;
+      this.emojiPickerVisible = false;
 
       try {
         const response = await request({
@@ -390,7 +394,7 @@ export default {
           method: 'post',
           data: {
             sessionId: this.currentSessionId,
-            messageType: 1,
+            messageType: messageType,
             content: messageContent
           }
         });
@@ -410,7 +414,7 @@ export default {
               messageId: message.messageId,
               sessionId: this.currentSessionId,
               fromUserId: this.currentUserId,
-              contentType: ContentType.TEXT,
+              contentType: contentType,
               content: messageContent,
               timestamp: new Date().toISOString()
             });
@@ -420,6 +424,13 @@ export default {
         console.error('发送消息失败:', error);
         this.$message.error('发送消息失败');
       }
+    },
+
+    isPureEmoji(content) {
+      const trimmed = content.trim();
+      if (!trimmed) return false;
+      const chars = Array.from(trimmed);
+      return chars.every(char => this.emojiList.includes(char));
     },
 
     getMessageContentType(message) {
@@ -589,8 +600,8 @@ export default {
     },
 
     selectEmoji(emoji) {
+      this.inputMessage += emoji;
       this.emojiPickerVisible = false;
-      this.sendEmojiMessage(emoji);
     },
 
     async sendEmojiMessage(emoji) {
@@ -970,14 +981,17 @@ export default {
 .emoji-picker {
   position: absolute;
   bottom: calc(100% + 8px);
-  left: 16px;
+  left: 8px;
+  right: 8px;
   background: white;
   border: 1px solid #e8e8e8;
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0,0,0,0.15);
   padding: 10px;
   z-index: 100;
-  max-width: 300px;
+  max-height: 220px;
+  overflow-y: auto;
+  box-sizing: border-box;
 }
 
 .emoji-grid {
@@ -987,12 +1001,13 @@ export default {
 }
 
 .emoji-item {
-  font-size: 22px;
+  font-size: 20px;
   cursor: pointer;
   padding: 4px;
   text-align: center;
   border-radius: 4px;
   transition: background-color 0.2s;
+  user-select: none;
 }
 
 .emoji-item:hover {
