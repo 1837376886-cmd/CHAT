@@ -93,8 +93,7 @@ public class ChatChannelHandler extends SimpleChannelInboundHandler<TextWebSocke
         if (userId != null) {
             SysUser user = sysUserService.selectUserById(userId);
             if (user != null && Integer.valueOf(1).equals(user.getIsCustomerService())) {
-                redisManager.setCsStatus(userId, "offline", redisManager.getMaxSessions(userId));
-                logger.info("客服下线: {} ({})", user.getNickName(), userId);
+                logger.info("客服WS断开: {} ({}), 不修改Redis在线状态", user.getNickName(), userId);
             }
             connectionManager.removeConnection(ctx.channel());
             broadcastUserStatus(userId, MessageType.USER_OFFLINE);
@@ -186,20 +185,10 @@ public class ChatChannelHandler extends SimpleChannelInboundHandler<TextWebSocke
                 response.setMessageId(UUID.randomUUID().toString());
                 sendMessage(ctx, response);
 
-                // 客服自动上线
+                // 客服WS认证成功，只记录日志，不自动修改上下线状态（由HTTP接口控制）
                 SysUser user = sysUserService.selectUserById(userId);
                 if (user != null && Integer.valueOf(1).equals(user.getIsCustomerService())) {
-                    int maxSessions = 5;
-                    try {
-                        CsConfig config = csConfigService.getOrCreateDefault(userId);
-                        if (config != null && config.getMaxSessions() != null) {
-                            maxSessions = config.getMaxSessions();
-                        }
-                    } catch (Exception e) {
-                        logger.warn("获取客服配置失败，使用默认值: {}", e.getMessage());
-                    }
-                    redisManager.setCsStatus(userId, "online", maxSessions);
-                    logger.info("客服上线: {} ({})", user.getNickName(), userId);
+                    logger.info("客服WS认证成功: {} ({})", user.getNickName(), userId);
                 }
 
                 broadcastUserStatus(userId, MessageType.USER_ONLINE);

@@ -90,6 +90,19 @@ public class CustomerServiceController {
     }
 
     /**
+     * 访客取消排队
+     */
+    @PostMapping("/waiting/cancel")
+    public AjaxResult cancelWaiting(@RequestBody Map<String, String> params) {
+        String visitorToken = params.get("visitorToken");
+        if (visitorToken == null || visitorToken.isEmpty()) {
+            return AjaxResult.error("参数错误");
+        }
+        redisManager.removeFromWaiting(visitorToken);
+        return AjaxResult.success();
+    }
+
+    /**
      * 访客发送消息
      */
     @PostMapping("/message/send")
@@ -152,7 +165,9 @@ public class CustomerServiceController {
             return AjaxResult.error("无权访问");
         }
         CsConfig config = csConfigService.getOrCreateDefault(user.getUserId());
-        redisManager.setCsStatus(user.getUserId(), "online", config.getMaxSessions());
+        // 同步数据库实际接待数，防止Redis计数漂移
+        List<CsSession> activeSessions = csSessionService.selectActiveSessionsByCsUserId(user.getUserId());
+        redisManager.setCsStatus(user.getUserId(), "online", config.getMaxSessions(), activeSessions.size());
 
         // 客服上线时处理挂起的访客并消费等待集合
         allocationService.processPendingOnCsOnline(user.getUserId());
@@ -189,7 +204,7 @@ public class CustomerServiceController {
             }
         }
 
-        redisManager.setCsStatus(user.getUserId(), "offline", redisManager.getMaxSessions(user.getUserId()));
+        redisManager.setCsStatus(user.getUserId(), "offline", redisManager.getMaxSessions(user.getUserId()), 0);
         return AjaxResult.success("已下线");
     }
 
@@ -340,26 +355,31 @@ public class CustomerServiceController {
     // ==================== 已登录用户接口 ====================
 
     /**
-     * 历史会话消息明细
+     * 历史会话消息明细（支持访客视角或客服视角）
      */
     @GetMapping("/my/history/{sessionId}/messages")
     public AjaxResult getMyHistoryMessages(@PathVariable Long sessionId) {
         SysUser user = SecurityUtils.getLoginUser().getUser();
-        // 校验该会话是否属于当前用户
         CsSession session = csSessionService.getById(sessionId);
         if (session == null) {
             return AjaxResult.error("会话不存在");
         }
-        ChatVisitor visitor = chatVisitorService.getById(session.getVisitorId());
-        if (visitor == null || !user.getUserId().equals(visitor.getBoundUserId())) {
-            return AjaxResult.error("无权查看");
+        // 客服视角：自己接待过的会话
+        if (Integer.valueOf(1).equals(user.getIsCustomerService()) && session.getCsUserId().equals(user.getUserId())) {
+            List<CsMessage> messages = csMessageService.selectMessagesBySessionId(sessionId);
+            return AjaxResult.success(messages);
         }
-        List<CsMessage> messages = csMessageService.selectMessagesBySessionId(sessionId);
-        return AjaxResult.success(messages);
+        // 访客视角：绑定的访客会话
+        ChatVisitor visitor = chatVisitorService.getById(session.getVisitorId());
+        if (visitor != null && user.getUserId().equals(visitor.getBoundUserId())) {
+            List<CsMessage> messages = csMessageService.selectMessagesBySessionId(sessionId);
+            return AjaxResult.success(messages);
+        }
+        return AjaxResult.error("无权查看");
     }
 
     /**
-     * 我的客服历史
+     * 我的客服历史（访客视角：我咨询过的记录）
      */
     @GetMapping("/my/history")
     public AjaxResult getMyHistory() {
@@ -367,6 +387,23 @@ public class CustomerServiceController {
         List<CsSession> sessions = csSessionService.list(
                 new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<CsSession>()
                         .inSql("visitor_id", "SELECT id FROM chat_visitor WHERE bound_user_id = " + user.getUserId())
+                        .orderByDesc("create_time")
+        );
+        return AjaxResult.success(sessions);
+    }
+
+    /**
+     * 我的接待历史（客服视角：我接待过的记录）
+     */
+    @GetMapping("/my/csHistory")
+    public AjaxResult getMyCsHistory() {
+        SysUser user = SecurityUtils.getLoginUser().getUser();
+        if (!Integer.valueOf(1).equals(user.getIsCustomerService())) {
+            return AjaxResult.error("无权访问");
+        }
+        List<CsSession> sessions = csSessionService.list(
+                new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<CsSession>()
+                        .eq("cs_user_id", user.getUserId())
                         .orderByDesc("create_time")
         );
         return AjaxResult.success(sessions);
@@ -409,6 +446,14 @@ public class CustomerServiceController {
             return AjaxResult.error("用户不存在");
         }
 
+        // 取消客服身份时，若该客服在线则禁止操作
+        if (Integer.valueOf(0).equals(isCs)) {
+            String status = redisManager.getCsStatus(userId);
+            if ("online".equals(status)) {
+                return AjaxResult.error("该客服当前在线，请先下线后再取消客服身份");
+            }
+        }
+
         user.setIsCustomerService(isCs);
         sysUserService.updateUser(user);
 
@@ -449,6 +494,12 @@ public class CustomerServiceController {
             return AjaxResult.error("用户不存在");
         }
 
+        // 客服在线时不允许编辑配置，防止配置与运行状态不一致
+        String status = redisManager.getCsStatus(userId);
+        if ("online".equals(status)) {
+            return AjaxResult.error("客服当前在线，请先下线后再修改配置");
+        }
+
         if (nickName != null) {
             user.setNickName(nickName);
             sysUserService.updateUser(user);
@@ -462,6 +513,11 @@ public class CustomerServiceController {
             config.setMaxSessions(maxSessions);
         }
         csConfigService.updateById(config);
+
+        // 同步更新 Redis 里的最大接待数（保持原状态和接待数）
+        if (maxSessions != null) {
+            redisManager.setCsStatus(userId, redisManager.getCsStatus(userId), maxSessions);
+        }
 
         return AjaxResult.success();
     }

@@ -8,6 +8,14 @@ export function csConnect(data) {
   })
 }
 
+export function cancelWaiting(visitorToken) {
+  return request({
+    url: '/cs/waiting/cancel',
+    method: 'post',
+    data: { visitorToken }
+  })
+}
+
 export function csSendMessage(data) {
   return request({
     url: '/cs/cs/message/send',
@@ -85,6 +93,13 @@ export function saveCsConfig(data) {
 export function getMyCsHistory() {
   return request({
     url: '/cs/my/history',
+    method: 'get'
+  })
+}
+
+export function getCsMyHistory() {
+  return request({
+    url: '/cs/my/csHistory',
     method: 'get'
   })
 }

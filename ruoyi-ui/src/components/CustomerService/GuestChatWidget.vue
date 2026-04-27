@@ -19,31 +19,39 @@
       </div>
 
       <div class="cs-chat-body" ref="messageContainer">
-        <div v-if="messages.length === 0" class="cs-empty-tip">
-          <p>欢迎使用在线客服</p>
-          <p v-if="waiting || waitingForLastCs">{{ statusMessage }}</p>
-          <p v-if="waiting && waitingPosition">当前排队第 {{ waitingPosition }} 位</p>
+        <div v-if="!confirmed" class="cs-welcome">
+          <i class="el-icon-service"></i>
+          <p class="cs-welcome-title">欢迎使用在线客服</p>
+          <p class="cs-welcome-desc">如有疑问，请点击下方按钮开始咨询</p>
+          <el-button type="primary" size="small" @click="startConsult">开始咨询</el-button>
         </div>
-        <div
-          v-for="(msg, index) in messages"
-          :key="index"
-          class="cs-message"
-          :class="[msg.isSystem ? 'system' : (msg.isSelf ? 'self' : 'other')]"
-        >
-          <template v-if="msg.isSystem">
-            <div class="cs-system-bubble">{{ msg.content }}</div>
-          </template>
-          <template v-else>
-            <div class="cs-msg-bubble">
-              <div class="cs-msg-sender">{{ msg.sender }}</div>
-              <div class="cs-msg-content">{{ msg.content }}</div>
-              <div class="cs-msg-time">{{ msg.time }}</div>
-            </div>
-          </template>
-        </div>
+        <template v-else>
+          <div v-if="messages.length === 0" class="cs-empty-tip">
+            <p>欢迎使用在线客服</p>
+            <p v-if="waiting || waitingForLastCs">{{ statusMessage }}</p>
+            <p v-if="waiting && waitingPosition">当前排队第 {{ waitingPosition }} 位</p>
+          </div>
+          <div
+            v-for="(msg, index) in messages"
+            :key="index"
+            class="cs-message"
+            :class="[msg.isSystem ? 'system' : (msg.isSelf ? 'self' : 'other')]"
+          >
+            <template v-if="msg.isSystem">
+              <div class="cs-system-bubble">{{ msg.content }}</div>
+            </template>
+            <template v-else>
+              <div class="cs-msg-bubble">
+                <div class="cs-msg-sender">{{ msg.sender }}</div>
+                <div class="cs-msg-content">{{ msg.content }}</div>
+                <div class="cs-msg-time">{{ msg.time }}</div>
+              </div>
+            </template>
+          </div>
+        </template>
       </div>
 
-      <div class="cs-chat-footer">
+      <div v-if="confirmed" class="cs-chat-footer">
         <el-input
           v-model="inputMessage"
           type="textarea"
@@ -66,7 +74,7 @@
 </template>
 
 <script>
-import { csConnect, getCsSessionHistory } from '@/api/cs'
+import { csConnect, getCsSessionHistory, cancelWaiting } from '@/api/cs'
 import { WS_URL, MessageType } from '@/utils/chatConstants'
 import ChatWebSocket from '@/utils/chatWebSocket'
 
@@ -75,6 +83,7 @@ export default {
   data() {
     return {
       isOpen: false,
+      confirmed: false,
       visitorToken: localStorage.getItem('cs_visitor_token') || '',
       deviceFingerprint: localStorage.getItem('cs_device_fp') || '',
       sessionId: null,
@@ -105,7 +114,7 @@ export default {
     }
   },
   methods: {
-    async openChat() {
+    openChat() {
       this.isOpen = true
       if (!this.deviceFingerprint) {
         this.deviceFingerprint = this.generateFingerprint()
@@ -115,10 +124,39 @@ export default {
         this.visitorToken = this.generateToken()
         localStorage.setItem('cs_visitor_token', this.visitorToken)
       }
-      await this.doConnect()
     },
     closeChat() {
+      if (this.waiting || this.waitingForLastCs) {
+        this.$confirm('您正在排队中，关闭后将退出排队，是否继续？', '提示', {
+          confirmButtonText: '退出排队',
+          cancelButtonText: '继续排队',
+          type: 'warning'
+        }).then(() => {
+          cancelWaiting(this.visitorToken).then(() => {
+            this.isOpen = false
+            this.confirmed = false
+            this.waiting = false
+            this.waitingForLastCs = false
+            this.waitingPosition = null
+            if (this.reconnectTimer) {
+              clearTimeout(this.reconnectTimer)
+              this.reconnectTimer = null
+            }
+          })
+        }).catch(() => {
+          // 用户选择继续排队，不做任何操作
+        })
+        return
+      }
       this.isOpen = false
+      if (!this.sessionId) {
+        this.confirmed = false
+      }
+    },
+    async startConsult() {
+      this.confirmed = true
+      this.messages = []
+      await this.doConnect()
     },
     generateToken() {
       return 'v_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9)
@@ -235,11 +273,6 @@ export default {
         return
       }
       if (msg.type === MessageType.SYSTEM_NOTICE) {
-        if (msg.content === '会话已结束') {
-          this.sessionId = null
-          this.csNickname = null
-          this.csUserId = null
-        }
         this.messages.push({
           sender: '系统',
           content: msg.content,
@@ -248,6 +281,16 @@ export default {
           isSystem: true
         })
         this.scrollToBottom()
+
+        if (msg.content === '会话已结束' || msg.content === '客服已下线，会话已结束') {
+          this.sessionId = null
+          this.csNickname = null
+          this.csUserId = null
+          this.confirmed = false
+          this.waiting = false
+          this.waitingForLastCs = false
+          this.messages = []
+        }
       }
       if (msg.type === MessageType.ERROR) {
         if (msg.content === '会话不存在或已结束') {
@@ -405,6 +448,30 @@ export default {
   text-align: center;
   color: #999;
   margin-top: 40px;
+}
+.cs-welcome {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: #606266;
+}
+.cs-welcome i {
+  font-size: 48px;
+  color: #409eff;
+  margin-bottom: 16px;
+}
+.cs-welcome-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.cs-welcome-desc {
+  font-size: 13px;
+  color: #909399;
+  margin-bottom: 20px;
 }
 .cs-message {
   margin-bottom: 12px;

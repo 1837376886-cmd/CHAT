@@ -30,11 +30,18 @@ public class CustomerServiceRedisManager {
      * 设置客服状态
      */
     public void setCsStatus(Long csUserId, String status, Integer maxSessions) {
+        setCsStatus(csUserId, status, maxSessions, null);
+    }
+
+    /**
+     * 设置客服状态（可指定接待数，null则保持原值）
+     */
+    public void setCsStatus(Long csUserId, String status, Integer maxSessions, Integer activeCount) {
         String key = CS_STATUS_PREFIX + csUserId;
         Map<String, Object> map = new HashMap<>();
         map.put("status", status);
         map.put("maxSessions", maxSessions != null ? maxSessions : 5);
-        map.put("activeCount", getActiveCount(csUserId));
+        map.put("activeCount", activeCount != null ? activeCount : getActiveCount(csUserId));
         map.put("lastHeartbeat", System.currentTimeMillis());
         redisCache.setCacheMap(key, map);
         redisCache.expire(key, 3600, TimeUnit.SECONDS);

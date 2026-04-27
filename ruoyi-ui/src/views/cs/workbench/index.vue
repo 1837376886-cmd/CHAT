@@ -144,7 +144,6 @@ export default {
     }
   },
   mounted() {
-    this.goOnline()
     this.loadSessions()
     this.initWebSocket()
     this.startWaitingPoll()

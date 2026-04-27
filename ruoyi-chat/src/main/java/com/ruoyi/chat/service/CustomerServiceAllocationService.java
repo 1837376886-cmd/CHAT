@@ -204,6 +204,7 @@ public class CustomerServiceAllocationService {
         ChatMessage notice = new ChatMessage();
         notice.setType(MessageType.SYSTEM_NOTICE);
         notice.setContent("新访客接入");
+        notice.setSessionId(String.valueOf(session.getId()));
         notice.setMessageId(java.util.UUID.randomUUID().toString());
         chatChannelHandler.sendMessageToUser(csUserId, notice);
 

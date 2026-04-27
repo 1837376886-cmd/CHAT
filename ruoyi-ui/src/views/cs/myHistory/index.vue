@@ -6,7 +6,7 @@
       </div>
       <el-table v-loading="loading" :data="historyList">
         <el-table-column label="会话ID" prop="id" width="80" />
-        <el-table-column label="客服" prop="csUserId" />
+        <el-table-column label="访客ID" prop="visitorId" />
         <el-table-column label="开始时间" prop="startTime" />
         <el-table-column label="结束时间" prop="endTime" />
         <el-table-column label="状态" width="100">
@@ -27,7 +27,7 @@
     <el-dialog title="消息记录" :visible.sync="detailVisible" width="600px">
       <div class="msg-list">
         <div v-for="(msg, index) in detailMessages" :key="index" class="msg-item">
-          <span class="msg-sender">{{ msg.fromType === 1 ? '我' : '客服' }}</span>
+          <span class="msg-sender">{{ msg.fromType === 2 ? '客服' : (msg.fromType === 1 ? '访客' : '系统') }}</span>
           <span class="msg-content">{{ msg.content }}</span>
           <span class="msg-time">{{ msg.createTime }}</span>
         </div>
@@ -37,8 +37,7 @@
 </template>
 
 <script>
-import { getMyCsHistory } from '@/api/cs'
-import request from '@/utils/request'
+import { getCsMyHistory, getCsSessionMessages } from '@/api/cs'
 
 export default {
   name: 'CsMyHistory',
@@ -56,16 +55,15 @@ export default {
   methods: {
     getList() {
       this.loading = true
-      getMyCsHistory().then(res => {
+      getCsMyHistory().then(res => {
         this.historyList = res.data || []
+        this.loading = false
+      }).catch(() => {
         this.loading = false
       })
     },
     viewDetail(row) {
-      request({
-        url: `/cs/my/history/${row.id}/messages`,
-        method: 'get'
-      }).then(res => {
+      getCsSessionMessages(row.id).then(res => {
         this.detailMessages = res.data || []
         this.detailVisible = true
       })
