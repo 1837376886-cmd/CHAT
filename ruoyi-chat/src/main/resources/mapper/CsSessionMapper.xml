@@ -8,6 +8,7 @@
         <result column="cs_user_id" property="csUserId" jdbcType="BIGINT"/>
         <result column="status" property="status" jdbcType="TINYINT"/>
         <result column="start_time" property="startTime" jdbcType="TIMESTAMP"/>
+        <result column="cs_unread_count" property="csUnreadCount" jdbcType="INTEGER"/>
         <result column="end_time" property="endTime" jdbcType="TIMESTAMP"/>
         <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
     </resultMap>
@@ -37,5 +38,11 @@
         WHERE cs_user_id = #{csUserId}
           AND status = 1
     </select>
+
+    <update id="incrementUnreadCount">
+        UPDATE cs_session
+        SET cs_unread_count = cs_unread_count + 1
+        WHERE id = #{sessionId}
+    </update>
 
 </mapper>

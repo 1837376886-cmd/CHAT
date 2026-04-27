@@ -22,17 +22,34 @@ public class ChatVisitorServiceImpl extends ServiceImpl<ChatVisitorMapper, ChatV
     private ChatVisitorMapper chatVisitorMapper;
 
     @Override
-    public ChatVisitor getOrCreateVisitor(String visitorToken, String ip, String userAgent, String sourcePage) {
-        ChatVisitor visitor = chatVisitorMapper.selectByVisitorToken(visitorToken);
+    public ChatVisitor getOrCreateVisitor(String visitorToken, String ip, String userAgent, String sourcePage, String deviceFingerprint) {
+        // 1. 优先按token查
+        if (visitorToken != null && !visitorToken.isEmpty()) {
+            ChatVisitor visitor = chatVisitorMapper.selectByVisitorToken(visitorToken);
+            if (visitor != null) {
+                return visitor;
+            }
+        }
+        // 2. 按设备指纹查（区分同一IP下不同用户）
+        if (deviceFingerprint != null && !deviceFingerprint.isEmpty()) {
+            ChatVisitor visitor = chatVisitorMapper.selectByDeviceFingerprint(deviceFingerprint, 30);
+            if (visitor != null) {
+                return visitor;
+            }
+        }
+        // 3. 按IP兜底（最近7天）
+        ChatVisitor visitor = chatVisitorMapper.selectRecentByIp(ip, 7);
         if (visitor != null) {
             return visitor;
         }
+        // 4. 创建新访客
         visitor = new ChatVisitor();
-        visitor.setVisitorToken(visitorToken);
+        visitor.setVisitorToken((visitorToken != null && !visitorToken.isEmpty()) ? visitorToken : UUID.randomUUID().toString().replace("-", ""));
         visitor.setNickname("访客" + UUID.randomUUID().toString().substring(0, 6));
         visitor.setIp(ip);
         visitor.setUserAgent(userAgent);
         visitor.setSourcePage(sourcePage);
+        visitor.setDeviceFingerprint(deviceFingerprint);
         chatVisitorMapper.insert(visitor);
         return visitor;
     }
@@ -58,5 +75,15 @@ public class ChatVisitorServiceImpl extends ServiceImpl<ChatVisitorMapper, ChatV
     @Override
     public List<ChatVisitor> selectUnboundByIp(String ip, int days) {
         return chatVisitorMapper.selectByIpAndUnbound(ip, days);
+    }
+
+    @Override
+    public ChatVisitor selectRecentByIp(String ip, int days) {
+        return chatVisitorMapper.selectRecentByIp(ip, days);
+    }
+
+    @Override
+    public ChatVisitor selectByDeviceFingerprint(String deviceFingerprint, int days) {
+        return chatVisitorMapper.selectByDeviceFingerprint(deviceFingerprint, days);
     }
 }

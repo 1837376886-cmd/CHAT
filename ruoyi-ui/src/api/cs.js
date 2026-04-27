@@ -45,6 +45,13 @@ export function closeCsSession(sessionId) {
   })
 }
 
+export function readCsSession(sessionId) {
+  return request({
+    url: `/cs/session/read/${sessionId}`,
+    method: 'post'
+  })
+}
+
 export function csStaffList() {
   return request({
     url: '/cs/staff/list',
@@ -55,6 +62,21 @@ export function csStaffList() {
 export function setCsStaff(data) {
   return request({
     url: '/cs/staff/set',
+    method: 'post',
+    data: data
+  })
+}
+
+export function getCsConfig(userId) {
+  return request({
+    url: `/cs/config/${userId}`,
+    method: 'get'
+  })
+}
+
+export function saveCsConfig(data) {
+  return request({
+    url: '/cs/config/save',
     method: 'post',
     data: data
   })
@@ -85,5 +107,12 @@ export function csOffline() {
   return request({
     url: '/cs/offline',
     method: 'post'
+  })
+}
+
+export function getWaitingCount() {
+  return request({
+    url: '/cs/waiting/count',
+    method: 'get'
   })
 }

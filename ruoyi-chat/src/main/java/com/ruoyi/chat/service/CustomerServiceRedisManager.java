@@ -114,33 +114,52 @@ public class CustomerServiceRedisManager {
     // ==================== 等待集合 ====================
 
     /**
-     * 添加访客到等待集合
+     * 添加访客到等待队列（FIFO，去重）
      */
     public void addToWaiting(String visitorToken) {
-        redisCache.redisTemplate.opsForSet().add(CS_WAITING_KEY, visitorToken);
+        List<Object> list = redisCache.redisTemplate.opsForList().range(CS_WAITING_KEY, 0, -1);
+        if (list == null || !list.contains(visitorToken)) {
+            redisCache.redisTemplate.opsForList().rightPush(CS_WAITING_KEY, visitorToken);
+        }
     }
 
     /**
-     * 从等待集合弹出一个访客
+     * 从等待队列弹出一个访客（FIFO）
      */
     public String popFromWaiting() {
-        Object obj = redisCache.redisTemplate.opsForSet().pop(CS_WAITING_KEY);
+        Object obj = redisCache.redisTemplate.opsForList().leftPop(CS_WAITING_KEY);
         return obj != null ? obj.toString() : null;
     }
 
     /**
-     * 从等待集合移除指定访客
+     * 从等待队列移除指定访客
      */
     public void removeFromWaiting(String visitorToken) {
-        redisCache.redisTemplate.opsForSet().remove(CS_WAITING_KEY, visitorToken);
+        redisCache.redisTemplate.opsForList().remove(CS_WAITING_KEY, 0, visitorToken);
     }
 
     /**
-     * 获取等待集合大小
+     * 获取等待队列大小
      */
     public long getWaitingCount() {
-        Long size = redisCache.redisTemplate.opsForSet().size(CS_WAITING_KEY);
+        Long size = redisCache.redisTemplate.opsForList().size(CS_WAITING_KEY);
         return size != null ? size : 0;
+    }
+
+    /**
+     * 获取访客在等待队列中的位置（1-based，0表示不在队列）
+     */
+    public int getWaitingPosition(String visitorToken) {
+        List<Object> list = redisCache.redisTemplate.opsForList().range(CS_WAITING_KEY, 0, -1);
+        if (list == null || list.isEmpty()) {
+            return 0;
+        }
+        for (int i = 0; i < list.size(); i++) {
+            if (visitorToken.equals(list.get(i))) {
+                return i + 1;
+            }
+        }
+        return 0;
     }
 
     // ==================== 上次客服挂起（Pending） ====================

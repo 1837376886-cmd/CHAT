@@ -67,8 +67,9 @@ public class CustomerServiceController {
         String ip = getClientIp(request);
         String userAgent = request.getHeader("User-Agent");
         String sourcePage = params.get("sourcePage");
+        String deviceFingerprint = params.get("deviceFingerprint");
 
-        ChatVisitor visitor = chatVisitorService.getOrCreateVisitor(visitorToken, ip, userAgent, sourcePage);
+        ChatVisitor visitor = chatVisitorService.getOrCreateVisitor(visitorToken, ip, userAgent, sourcePage, deviceFingerprint);
 
         CustomerServiceAllocationService.AllocationResult result = allocationService.allocate(visitor);
 
@@ -81,6 +82,9 @@ public class CustomerServiceController {
         data.put("csUserId", result.getCsUserId());
         data.put("csNickname", result.getCsNickname());
         data.put("message", result.getMessage());
+        if (result.isWaiting()) {
+            data.put("waitingPosition", redisManager.getWaitingPosition(visitorToken));
+        }
 
         return AjaxResult.success(data);
     }
@@ -149,6 +153,11 @@ public class CustomerServiceController {
         }
         CsConfig config = csConfigService.getOrCreateDefault(user.getUserId());
         redisManager.setCsStatus(user.getUserId(), "online", config.getMaxSessions());
+
+        // 客服上线时处理挂起的访客并消费等待集合
+        allocationService.processPendingOnCsOnline(user.getUserId());
+        allocationService.tryConsumeWaitingAfterClose(user.getUserId());
+
         return AjaxResult.success("已上线");
     }
 
@@ -161,6 +170,25 @@ public class CustomerServiceController {
         if (!Integer.valueOf(1).equals(user.getIsCustomerService())) {
             return AjaxResult.error("无权访问");
         }
+
+        // 结束所有进行中的会话并通知访客
+        List<CsSession> activeSessions = csSessionService.selectActiveSessionsByCsUserId(user.getUserId());
+        for (CsSession session : activeSessions) {
+            csSessionService.closeSession(session.getId());
+            csMessageService.sendSystemMessage(session.getId(), "客服已下线，会话已结束");
+            try {
+                ChatVisitor visitor = chatVisitorService.getById(session.getVisitorId());
+                if (visitor != null) {
+                    com.ruoyi.chat.protocol.ChatMessage systemMsg = new com.ruoyi.chat.protocol.ChatMessage(com.ruoyi.chat.protocol.MessageType.SYSTEM_NOTICE);
+                    systemMsg.setContent("客服已下线，会话已结束");
+                    systemMsg.setMessageId(java.util.UUID.randomUUID().toString());
+                    chatChannelHandler.sendMessageToVisitor(visitor.getVisitorToken(), systemMsg);
+                }
+            } catch (Exception e) {
+                // 推送失败不影响下线流程
+            }
+        }
+
         redisManager.setCsStatus(user.getUserId(), "offline", redisManager.getMaxSessions(user.getUserId()));
         return AjaxResult.success("已下线");
     }
@@ -220,6 +248,36 @@ public class CustomerServiceController {
         allocationService.tryConsumeWaitingAfterClose(user.getUserId());
 
         return AjaxResult.success();
+    }
+
+    /**
+     * 客服标记会话已读（清零未读数）
+     */
+    @PostMapping("/session/read/{sessionId}")
+    public AjaxResult readSession(@PathVariable Long sessionId) {
+        SysUser user = SecurityUtils.getLoginUser().getUser();
+        if (!Integer.valueOf(1).equals(user.getIsCustomerService())) {
+            return AjaxResult.error("无权访问");
+        }
+        CsSession session = csSessionService.getById(sessionId);
+        if (session == null || !session.getCsUserId().equals(user.getUserId())) {
+            return AjaxResult.error("无权操作");
+        }
+        csSessionService.resetUnreadCount(sessionId);
+        return AjaxResult.success();
+    }
+
+    /**
+     * 获取等待队列人数
+     */
+    @GetMapping("/waiting/count")
+    public AjaxResult getWaitingCount() {
+        SysUser user = SecurityUtils.getLoginUser().getUser();
+        if (!Integer.valueOf(1).equals(user.getIsCustomerService())) {
+            return AjaxResult.error("无权访问");
+        }
+        long count = redisManager.getWaitingCount();
+        return AjaxResult.success(count);
     }
 
     /**
@@ -335,6 +393,57 @@ public class CustomerServiceController {
 
         user.setIsCustomerService(isCs);
         sysUserService.updateUser(user);
+
+        return AjaxResult.success();
+    }
+
+    /**
+     * 查询客服配置
+     */
+    @GetMapping("/config/{userId}")
+    public AjaxResult getCsConfig(@PathVariable Long userId) {
+        SysUser currentUser = SecurityUtils.getLoginUser().getUser();
+        if (!Integer.valueOf(1).equals(currentUser.getIsCustomerService()) && !currentUser.isAdmin()) {
+            return AjaxResult.error("无权访问");
+        }
+        SysUser user = sysUserService.selectUserById(userId);
+        CsConfig config = csConfigService.getOrCreateDefault(userId);
+        Map<String, Object> data = new HashMap<>();
+        data.put("userId", userId);
+        data.put("nickName", user != null ? user.getNickName() : "");
+        data.put("autoReply", config.getAutoReply());
+        data.put("maxSessions", config.getMaxSessions());
+        return AjaxResult.success(data);
+    }
+
+    /**
+     * 保存客服配置（别名、默认回复语、最大接待数）
+     */
+    @PostMapping("/config/save")
+    public AjaxResult saveCsConfig(@RequestBody Map<String, Object> params) {
+        Long userId = Long.valueOf(params.get("userId").toString());
+        String nickName = (String) params.get("nickName");
+        String autoReply = (String) params.get("autoReply");
+        Integer maxSessions = params.get("maxSessions") != null ? Integer.valueOf(params.get("maxSessions").toString()) : null;
+
+        SysUser user = sysUserService.selectUserById(userId);
+        if (user == null) {
+            return AjaxResult.error("用户不存在");
+        }
+
+        if (nickName != null) {
+            user.setNickName(nickName);
+            sysUserService.updateUser(user);
+        }
+
+        CsConfig config = csConfigService.getOrCreateDefault(userId);
+        if (autoReply != null) {
+            config.setAutoReply(autoReply);
+        }
+        if (maxSessions != null) {
+            config.setMaxSessions(maxSessions);
+        }
+        csConfigService.updateById(config);
 
         return AjaxResult.success();
     }

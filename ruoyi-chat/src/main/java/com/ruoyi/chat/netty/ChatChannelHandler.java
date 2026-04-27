@@ -74,6 +74,13 @@ public class ChatChannelHandler extends SimpleChannelInboundHandler<TextWebSocke
         }
     }
 
+    public void sendMessageToUser(Long userId, ChatMessage message) {
+        io.netty.channel.Channel ch = connectionManager.getUserChannel(userId);
+        if (ch != null && ch.isActive()) {
+            sendMessage(ch, message);
+        }
+    }
+
     @Override
     public void channelActive(ChannelHandlerContext ctx) throws Exception {
         logger.info("WebSocket连接建立：{}", ctx.channel().id().asShortText());
@@ -342,6 +349,8 @@ public class ChatChannelHandler extends SimpleChannelInboundHandler<TextWebSocke
                 } else {
                     logger.warn("CS_CHAT客服通道不可用, csUserId={}, channel={}", session.getCsUserId(), csChannel);
                 }
+                // 访客消息统一累加客服未读数（前端查看后会清零）
+                csSessionService.incrementUnreadCount(sessionId);
             }
 
             // 发送确认

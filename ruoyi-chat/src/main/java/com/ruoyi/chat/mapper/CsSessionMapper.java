@@ -32,4 +32,9 @@ public interface CsSessionMapper extends BaseMapper<CsSession> {
      * 根据客服ID统计进行中会话数
      */
     int countActiveSessionsByCsUserId(@Param("csUserId") Long csUserId);
+
+    /**
+     * 增加客服未读消息数
+     */
+    void incrementUnreadCount(@Param("sessionId") Long sessionId);
 }

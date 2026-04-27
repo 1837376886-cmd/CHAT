@@ -12,7 +12,7 @@
         <div class="cs-header-info">
           <span class="cs-title">在线客服</span>
           <span v-if="csNickname" class="cs-subtitle">{{ csNickname }}</span>
-          <span v-else-if="waiting" class="cs-status waiting">等待中...</span>
+          <span v-else-if="waiting" class="cs-status waiting">排队中 {{ waitingPosition ? '（第'+waitingPosition+'位）' : '' }}</span>
           <span v-else-if="waitingForLastCs" class="cs-status waiting">联系上次客服中...</span>
         </div>
         <i class="el-icon-close cs-close" @click="closeChat"></i>
@@ -22,18 +22,24 @@
         <div v-if="messages.length === 0" class="cs-empty-tip">
           <p>欢迎使用在线客服</p>
           <p v-if="waiting || waitingForLastCs">{{ statusMessage }}</p>
+          <p v-if="waiting && waitingPosition">当前排队第 {{ waitingPosition }} 位</p>
         </div>
         <div
           v-for="(msg, index) in messages"
           :key="index"
           class="cs-message"
-          :class="msg.isSelf ? 'self' : 'other'"
+          :class="[msg.isSystem ? 'system' : (msg.isSelf ? 'self' : 'other')]"
         >
-          <div class="cs-msg-bubble">
-            <div class="cs-msg-sender">{{ msg.sender }}</div>
-            <div class="cs-msg-content">{{ msg.content }}</div>
-            <div class="cs-msg-time">{{ msg.time }}</div>
-          </div>
+          <template v-if="msg.isSystem">
+            <div class="cs-system-bubble">{{ msg.content }}</div>
+          </template>
+          <template v-else>
+            <div class="cs-msg-bubble">
+              <div class="cs-msg-sender">{{ msg.sender }}</div>
+              <div class="cs-msg-content">{{ msg.content }}</div>
+              <div class="cs-msg-time">{{ msg.time }}</div>
+            </div>
+          </template>
         </div>
       </div>
 
@@ -70,11 +76,13 @@ export default {
     return {
       isOpen: false,
       visitorToken: localStorage.getItem('cs_visitor_token') || '',
+      deviceFingerprint: localStorage.getItem('cs_device_fp') || '',
       sessionId: null,
       csUserId: null,
       csNickname: null,
       waiting: false,
       waitingForLastCs: false,
+      waitingPosition: null,
       statusMessage: '',
       inputMessage: '',
       messages: [],
@@ -99,6 +107,10 @@ export default {
   methods: {
     async openChat() {
       this.isOpen = true
+      if (!this.deviceFingerprint) {
+        this.deviceFingerprint = this.generateFingerprint()
+        localStorage.setItem('cs_device_fp', this.deviceFingerprint)
+      }
       if (!this.visitorToken) {
         this.visitorToken = this.generateToken()
         localStorage.setItem('cs_visitor_token', this.visitorToken)
@@ -111,15 +123,51 @@ export default {
     generateToken() {
       return 'v_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9)
     },
+    generateFingerprint() {
+      const canvas = document.createElement('canvas')
+      const ctx = canvas.getContext('2d')
+      ctx.textBaseline = 'top'
+      ctx.font = '14px Arial'
+      ctx.fillText('Hello, visitor!', 2, 2)
+      const canvasData = canvas.toDataURL()
+
+      // 不取 userAgent（避免同一台电脑的不同浏览器被区分）
+      const components = [
+        navigator.language,
+        screen.colorDepth,
+        screen.width + 'x' + screen.height,
+        new Date().getTimezoneOffset(),
+        canvasData,
+        navigator.platform,
+        navigator.hardwareConcurrency || '',
+        navigator.deviceMemory || ''
+      ]
+
+      let hash = 0
+      const str = components.join('###')
+      for (let i = 0; i < str.length; i++) {
+        const char = str.charCodeAt(i)
+        hash = ((hash << 5) - hash) + char
+        hash = hash & hash
+      }
+      return 'fp_' + Math.abs(hash).toString(16)
+    },
     async doConnect() {
       try {
         const res = await csConnect({
           visitorToken: this.visitorToken,
+          deviceFingerprint: this.deviceFingerprint,
           sourcePage: window.location.href
         })
         const data = res.data
+        // 后端可能按IP复用了旧token，需要同步更新
+        if (data.visitorToken) {
+          this.visitorToken = data.visitorToken
+          localStorage.setItem('cs_visitor_token', this.visitorToken)
+        }
         this.waiting = data.waiting || false
         this.waitingForLastCs = data.waitingForLastCs || false
+        this.waitingPosition = data.waitingPosition || null
         this.statusMessage = data.message || ''
 
         if (data.success) {
@@ -196,7 +244,8 @@ export default {
           sender: '系统',
           content: msg.content,
           time: this.formatTime(new Date()),
-          isSelf: false
+          isSelf: false,
+          isSystem: true
         })
         this.scrollToBottom()
       }
@@ -219,7 +268,8 @@ export default {
           sender: item.fromType === 1 ? '我' : (item.fromType === 2 ? '客服' : '系统'),
           content: item.content,
           time: this.formatTime(item.createTime),
-          isSelf: item.fromType === 1
+          isSelf: item.fromType === 1,
+          isSystem: item.fromType === 3
         }))
         this.scrollToBottom()
       } catch (e) {
@@ -365,6 +415,19 @@ export default {
 }
 .cs-message.other {
   justify-content: flex-start;
+}
+.cs-message.system {
+  justify-content: center;
+}
+.cs-system-bubble {
+  display: inline-block;
+  padding: 5px 14px;
+  border-radius: 12px;
+  background: #dcdfe6;
+  color: #606266;
+  font-size: 12px;
+  max-width: 80%;
+  text-align: center;
 }
 .cs-msg-bubble {
   max-width: 70%;

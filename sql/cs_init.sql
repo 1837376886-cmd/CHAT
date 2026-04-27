@@ -15,11 +15,13 @@ CREATE TABLE IF NOT EXISTS `chat_visitor` (
   `source_page` varchar(255) DEFAULT NULL COMMENT '来源页面URL',
   `bound_user_id` bigint DEFAULT NULL COMMENT '已绑定的sys_user.id（登录后回填，用于历史关联）',
   `last_cs_user_id` bigint DEFAULT NULL COMMENT '最近一次接待该访客的客服userId（用于优先分配）',
+  `device_fingerprint` varchar(64) DEFAULT NULL COMMENT '设备指纹（用于区分同一IP下不同设备）',
   `last_session_end_time` datetime DEFAULT NULL COMMENT '最近一次会话结束时间',
   `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_visitor_token` (`visitor_token`),
   KEY `idx_ip` (`ip`),
+  KEY `idx_device_fingerprint` (`device_fingerprint`),
   KEY `idx_bound_user_id` (`bound_user_id`),
   KEY `idx_create_time` (`create_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='访客信息表';
@@ -30,6 +32,7 @@ CREATE TABLE IF NOT EXISTS `cs_session` (
   `visitor_id` bigint NOT NULL COMMENT '访客ID（chat_visitor.id）',
   `cs_user_id` bigint NOT NULL COMMENT '客服用户ID（sys_user.id）',
   `status` tinyint DEFAULT 1 COMMENT '状态：0-已结束，1-进行中，2-等待中（满员话术兜底）',
+  `cs_unread_count` int DEFAULT 0 COMMENT '客服未读消息数（访客发送且客服离线时累加）',
   `start_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '会话开始时间',
   `end_time` datetime DEFAULT NULL COMMENT '会话结束时间',
   `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',

@@ -11,6 +11,7 @@
         <result column="source_page" property="sourcePage" jdbcType="VARCHAR"/>
         <result column="bound_user_id" property="boundUserId" jdbcType="BIGINT"/>
         <result column="last_cs_user_id" property="lastCsUserId" jdbcType="BIGINT"/>
+        <result column="device_fingerprint" property="deviceFingerprint" jdbcType="VARCHAR"/>
         <result column="last_session_end_time" property="lastSessionEndTime" jdbcType="TIMESTAMP"/>
         <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
     </resultMap>
@@ -25,6 +26,22 @@
           AND bound_user_id IS NULL
           AND create_time > DATE_SUB(NOW(), INTERVAL #{days} DAY)
         ORDER BY create_time DESC
+    </select>
+
+    <select id="selectRecentByIp" resultMap="BaseResultMap">
+        SELECT * FROM chat_visitor
+        WHERE ip = #{ip}
+          AND create_time > DATE_SUB(NOW(), INTERVAL #{days} DAY)
+        ORDER BY create_time DESC
+        LIMIT 1
+    </select>
+
+    <select id="selectByDeviceFingerprint" resultMap="BaseResultMap">
+        SELECT * FROM chat_visitor
+        WHERE device_fingerprint = #{deviceFingerprint}
+          AND create_time > DATE_SUB(NOW(), INTERVAL #{days} DAY)
+        ORDER BY create_time DESC
+        LIMIT 1
     </select>
 
     <update id="bindUserIdByIp">

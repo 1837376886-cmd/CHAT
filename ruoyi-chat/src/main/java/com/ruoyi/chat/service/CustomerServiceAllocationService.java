@@ -2,15 +2,13 @@ package com.ruoyi.chat.service;
 
 import com.ruoyi.chat.domain.entity.ChatVisitor;
 import com.ruoyi.chat.domain.entity.CsConfig;
+import com.ruoyi.chat.domain.entity.CsMessage;
 import com.ruoyi.chat.domain.entity.CsSession;
-import com.alibaba.fastjson2.JSON;
-import com.ruoyi.chat.netty.ChatConnectionManager;
+import com.ruoyi.chat.netty.ChatChannelHandler;
 import com.ruoyi.chat.protocol.ChatMessage;
 import com.ruoyi.chat.protocol.MessageType;
 import com.ruoyi.common.core.domain.entity.SysUser;
 import com.ruoyi.system.mapper.SysUserMapper;
-import io.netty.channel.Channel;
-import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -44,7 +42,7 @@ public class CustomerServiceAllocationService {
     private ICsConfigService csConfigService;
 
     @Autowired
-    private ChatConnectionManager chatConnectionManager;
+    private ChatChannelHandler chatChannelHandler;
 
     /**
      * 分配结果
@@ -117,11 +115,7 @@ public class CustomerServiceAllocationService {
                     return createSessionAndAssign(visitor, lastCsUserId, lastCs.getNickName());
                 }
 
-                if ("offline".equals(status) && activeCount < maxSessions) {
-                    // 上次客服离线但未满 -> 挂起等待30秒
-                    redisManager.setPending(lastCsUserId, visitor.getVisitorToken(), 30);
-                    return AllocationResult.waitingForLastCs(lastCs.getNickName());
-                }
+                // 上次客服离线或已满 -> 直接走默认分配，不等待
             }
         }
 
@@ -186,18 +180,32 @@ public class CustomerServiceAllocationService {
         redisManager.setVisitorSession(visitor.getVisitorToken(), session.getId(), csUserId);
         chatVisitorService.updateLastCsUserId(visitor.getId(), csUserId);
 
-        // 发送系统欢迎消息
-        csMessageService.sendSystemMessage(session.getId(), "客服 " + csNickname + " 已接入，请问有什么可以帮您？");
+        // 读取客服配置的默认回复语
+        CsConfig config = csConfigService.getOrCreateDefault(csUserId);
+        String welcomeMsg = config.getAutoReply();
+        if (welcomeMsg == null || welcomeMsg.isEmpty()) {
+            welcomeMsg = "客服 " + csNickname + " 已接入，请问有什么可以帮您？";
+        }
+        String displayMsg = "自动回复：" + welcomeMsg;
+
+        // 保存为客服消息并推送给访客
+        csMessageService.sendMessage(session.getId(), CsMessage.FromType.CS, csUserId, displayMsg);
+        ChatMessage pushMsg = new ChatMessage();
+        pushMsg.setType(MessageType.CS_CHAT);
+        pushMsg.setSessionId(String.valueOf(session.getId()));
+        pushMsg.setContent(displayMsg);
+        pushMsg.setFromUserId(csUserId);
+        pushMsg.setFromUserNickname(csNickname);
+        pushMsg.setTimestamp(new java.util.Date());
+        pushMsg.setMessageId(java.util.UUID.randomUUID().toString());
+        chatChannelHandler.sendMessageToVisitor(visitor.getVisitorToken(), pushMsg);
 
         // 通知客服有新会话
-        Channel csChannel = chatConnectionManager.getUserChannel(csUserId);
-        if (csChannel != null && csChannel.isActive()) {
-            ChatMessage notice = new ChatMessage();
-            notice.setType(MessageType.SYSTEM_NOTICE);
-            notice.setContent("新访客接入");
-            String noticeJson = JSON.toJSONString(notice);
-            csChannel.writeAndFlush(new TextWebSocketFrame(noticeJson));
-        }
+        ChatMessage notice = new ChatMessage();
+        notice.setType(MessageType.SYSTEM_NOTICE);
+        notice.setContent("新访客接入");
+        notice.setMessageId(java.util.UUID.randomUUID().toString());
+        chatChannelHandler.sendMessageToUser(csUserId, notice);
 
         return AllocationResult.success(session.getId(), csUserId, csNickname);
     }

@@ -24,6 +24,16 @@ public interface ChatVisitorMapper extends BaseMapper<ChatVisitor> {
     List<ChatVisitor> selectByIpAndUnbound(@Param("ip") String ip, @Param("days") int days);
 
     /**
+     * 根据IP查询最近活跃的访客（不限绑定状态）
+     */
+    ChatVisitor selectRecentByIp(@Param("ip") String ip, @Param("days") int days);
+
+    /**
+     * 根据设备指纹查询最近活跃的访客
+     */
+    ChatVisitor selectByDeviceFingerprint(@Param("deviceFingerprint") String deviceFingerprint, @Param("days") int days);
+
+    /**
      * 绑定用户ID到访客记录
      */
     int bindUserIdByIp(@Param("userId") Long userId, @Param("ip") String ip, @Param("days") int days);

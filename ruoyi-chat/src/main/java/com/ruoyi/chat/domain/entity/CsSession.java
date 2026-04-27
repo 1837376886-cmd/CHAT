@@ -47,6 +47,12 @@ public class CsSession implements Serializable {
     private Integer status;
 
     /**
+     * 客服未读消息数
+     */
+    @TableField("cs_unread_count")
+    private Integer csUnreadCount;
+
+    /**
      * 会话开始时间
      */
     @TableField("start_time")

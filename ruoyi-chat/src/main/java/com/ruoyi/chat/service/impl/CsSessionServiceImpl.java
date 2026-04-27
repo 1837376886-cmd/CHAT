@@ -55,4 +55,17 @@ public class CsSessionServiceImpl extends ServiceImpl<CsSessionMapper, CsSession
     public List<CsSession> selectSessionsByVisitorId(Long visitorId) {
         return csSessionMapper.selectSessionsByVisitorId(visitorId);
     }
+
+    @Override
+    public void incrementUnreadCount(Long sessionId) {
+        csSessionMapper.incrementUnreadCount(sessionId);
+    }
+
+    @Override
+    public void resetUnreadCount(Long sessionId) {
+        CsSession session = new CsSession();
+        session.setId(sessionId);
+        session.setCsUnreadCount(0);
+        csSessionMapper.updateById(session);
+    }
 }

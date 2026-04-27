@@ -36,4 +36,14 @@ public interface ICsSessionService extends IService<CsSession> {
      * 查询访客的历史会话列表
      */
     List<CsSession> selectSessionsByVisitorId(Long visitorId);
+
+    /**
+     * 增加客服未读消息数
+     */
+    void incrementUnreadCount(Long sessionId);
+
+    /**
+     * 清零客服未读消息数
+     */
+    void resetUnreadCount(Long sessionId);
 }
