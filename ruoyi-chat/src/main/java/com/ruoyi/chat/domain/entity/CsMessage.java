@@ -59,6 +59,12 @@ public class CsMessage implements Serializable {
     private Integer msgType;
 
     /**
+     * 发送者名称（不存库，仅用于展示）
+     */
+    @TableField(exist = false)
+    private String senderName;
+
+    /**
      * 创建时间
      */
     @TableField(value = "create_time", fill = FieldFill.INSERT)

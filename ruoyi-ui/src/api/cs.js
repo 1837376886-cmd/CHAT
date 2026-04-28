@@ -97,10 +97,11 @@ export function getMyCsHistory() {
   })
 }
 
-export function getCsMyHistory() {
+export function getCsMyHistory(params) {
   return request({
     url: '/cs/my/csHistory',
-    method: 'get'
+    method: 'get',
+    params
   })
 }
 

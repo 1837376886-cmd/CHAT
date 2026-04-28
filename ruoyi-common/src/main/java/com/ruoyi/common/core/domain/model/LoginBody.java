@@ -27,6 +27,11 @@ public class LoginBody
      */
     private String uuid;
 
+    /**
+     * 设备指纹（用于绑定匿名访客记录）
+     */
+    private String deviceFingerprint;
+
     public String getUsername()
     {
         return username;
@@ -65,5 +70,15 @@ public class LoginBody
     public void setUuid(String uuid)
     {
         this.uuid = uuid;
+    }
+
+    public String getDeviceFingerprint()
+    {
+        return deviceFingerprint;
+    }
+
+    public void setDeviceFingerprint(String deviceFingerprint)
+    {
+        this.deviceFingerprint = deviceFingerprint;
     }
 }

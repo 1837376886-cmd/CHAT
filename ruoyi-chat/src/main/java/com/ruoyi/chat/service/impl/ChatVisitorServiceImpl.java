@@ -30,9 +30,9 @@ public class ChatVisitorServiceImpl extends ServiceImpl<ChatVisitorMapper, ChatV
                 return visitor;
             }
         }
-        // 2. 按设备指纹查（区分同一IP下不同用户）
+        // 2. 按设备指纹查（长期有效，不限制时间）
         if (deviceFingerprint != null && !deviceFingerprint.isEmpty()) {
-            ChatVisitor visitor = chatVisitorMapper.selectByDeviceFingerprint(deviceFingerprint, 30);
+            ChatVisitor visitor = chatVisitorMapper.selectByDeviceFingerprint(deviceFingerprint, 3650);
             if (visitor != null) {
                 return visitor;
             }
@@ -50,6 +50,7 @@ public class ChatVisitorServiceImpl extends ServiceImpl<ChatVisitorMapper, ChatV
         visitor.setUserAgent(userAgent);
         visitor.setSourcePage(sourcePage);
         visitor.setDeviceFingerprint(deviceFingerprint);
+        visitor.setCreateTime(java.time.LocalDateTime.now());
         chatVisitorMapper.insert(visitor);
         return visitor;
     }

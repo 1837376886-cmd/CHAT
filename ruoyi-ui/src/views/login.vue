@@ -67,7 +67,7 @@ import { getCodeImg } from "@/api/login"
 import Cookies from "js-cookie"
 import { encrypt, decrypt } from '@/utils/jsencrypt'
 import GuestChatWidget from '@/components/CustomerService/GuestChatWidget'
-import { confirmBindHistory } from '@/api/cs'
+import { getOrCreateDeviceFingerprint } from '@/utils/deviceFingerprint'
 
 export default {
   name: "Login",
@@ -83,7 +83,8 @@ export default {
         password: "admin123",
         rememberMe: false,
         code: "",
-        uuid: ""
+        uuid: "",
+        deviceFingerprint: ""
       },
       loginRules: {
         username: [
@@ -147,11 +148,8 @@ export default {
             Cookies.remove("password")
             Cookies.remove('rememberMe')
           }
+          this.loginForm.deviceFingerprint = getOrCreateDeviceFingerprint()
           this.$store.dispatch("Login", this.loginForm).then(() => {
-            const deviceFp = localStorage.getItem('cs_device_fp')
-            if (deviceFp) {
-              confirmBindHistory(deviceFp).catch(() => {})
-            }
             this.$router.push({ path: this.redirect || "/" }).catch(()=>{})
           }).catch(() => {
             this.loading = false

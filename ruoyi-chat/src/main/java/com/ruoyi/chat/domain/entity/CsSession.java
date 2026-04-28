@@ -67,6 +67,12 @@ public class CsSession implements Serializable {
     private LocalDateTime endTime;
 
     /**
+     * 访客昵称（不存库，仅展示）
+     */
+    @TableField(exist = false)
+    private String visitorNickname;
+
+    /**
      * 创建时间
      */
     @TableField(value = "create_time", fill = FieldFill.INSERT)

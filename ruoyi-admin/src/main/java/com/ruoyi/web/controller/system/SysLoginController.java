@@ -26,6 +26,7 @@ import com.ruoyi.framework.web.service.SysPermissionService;
 import com.ruoyi.framework.web.service.TokenService;
 import com.ruoyi.system.service.ISysConfigService;
 import com.ruoyi.system.service.ISysMenuService;
+import com.ruoyi.system.service.ISysUserService;
 
 /**
  * 登录验证
@@ -51,6 +52,9 @@ public class SysLoginController
     private ISysConfigService configService;
 
     @Autowired
+    private ISysUserService sysUserService;
+
+    @Autowired
     private IChatVisitorService chatVisitorService;
 
     /**
@@ -68,11 +72,10 @@ public class SysLoginController
                 loginBody.getUuid());
         ajax.put(Constants.TOKEN, token);
 
-        // 查询该IP下未绑定的访客记录数量
-        String ip = getClientIp(request);
-        List<ChatVisitor> unboundVisitors = chatVisitorService.selectUnboundByIp(ip, 90);
-        if (unboundVisitors != null && !unboundVisitors.isEmpty()) {
-            ajax.put("pendingCsHistoryCount", unboundVisitors.size());
+        // 登录成功后按设备指纹绑定匿名访客记录
+        SysUser user = sysUserService.selectUserByUserName(loginBody.getUsername());
+        if (user != null && StringUtils.isNotEmpty(loginBody.getDeviceFingerprint())) {
+            chatVisitorService.bindByLogin(user.getUserId(), loginBody.getDeviceFingerprint());
         }
 
         return ajax;

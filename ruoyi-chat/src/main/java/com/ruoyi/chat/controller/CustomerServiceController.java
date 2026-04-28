@@ -325,6 +325,33 @@ public class CustomerServiceController {
             return AjaxResult.error("无权操作");
         }
         List<CsMessage> messages = csMessageService.selectMessagesBySessionId(sessionId);
+
+        // 填充发送者名称
+        ChatVisitor visitor = chatVisitorService.getById(session.getVisitorId());
+        String visitorName = null;
+        if (visitor != null) {
+            if (visitor.getBoundUserId() != null) {
+                SysUser boundUser = sysUserService.selectUserById(visitor.getBoundUserId());
+                visitorName = boundUser != null ? boundUser.getNickName() : visitor.getNickname();
+            } else {
+                visitorName = visitor.getNickname();
+            }
+        }
+        if (visitorName == null) {
+            visitorName = "访客";
+        }
+
+        for (CsMessage msg : messages) {
+            if (msg.getFromType() == CsMessage.FromType.VISITOR) {
+                msg.setSenderName(visitorName);
+            } else if (msg.getFromType() == CsMessage.FromType.CS) {
+                SysUser csUser = sysUserService.selectUserById(msg.getFromUserId());
+                msg.setSenderName(csUser != null ? csUser.getNickName() : "客服");
+            } else {
+                msg.setSenderName("系统");
+            }
+        }
+
         return AjaxResult.success(messages);
     }
 
@@ -412,17 +439,38 @@ public class CustomerServiceController {
      * 我的接待历史（客服视角：我接待过的记录）
      */
     @GetMapping("/my/csHistory")
-    public AjaxResult getMyCsHistory() {
+    public AjaxResult getMyCsHistory(@RequestParam(defaultValue = "1") int pageNum,
+                                      @RequestParam(defaultValue = "10") int pageSize) {
         SysUser user = SecurityUtils.getLoginUser().getUser();
         if (!Integer.valueOf(1).equals(user.getIsCustomerService())) {
             return AjaxResult.error("无权访问");
         }
-        List<CsSession> sessions = csSessionService.list(
+        com.baomidou.mybatisplus.extension.plugins.pagination.Page<CsSession> page =
+                new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(pageNum, pageSize);
+        com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<CsSession> wrapper =
                 new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<CsSession>()
                         .eq("cs_user_id", user.getUserId())
-                        .orderByDesc("create_time")
-        );
-        return AjaxResult.success(sessions);
+                        .orderByDesc("create_time");
+        csSessionService.page(page, wrapper);
+
+        for (CsSession session : page.getRecords()) {
+            ChatVisitor visitor = chatVisitorService.getById(session.getVisitorId());
+            if (visitor != null) {
+                if (visitor.getBoundUserId() != null) {
+                    SysUser boundUser = sysUserService.selectUserById(visitor.getBoundUserId());
+                    session.setVisitorNickname(boundUser != null ? boundUser.getNickName() : visitor.getNickname());
+                } else {
+                    session.setVisitorNickname(visitor.getNickname());
+                }
+            } else {
+                session.setVisitorNickname("访客_" + session.getVisitorId());
+            }
+        }
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("rows", page.getRecords());
+        data.put("total", page.getTotal());
+        return AjaxResult.success(data);
     }
 
     /**

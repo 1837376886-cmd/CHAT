@@ -162,33 +162,8 @@ export default {
       return 'v_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9)
     },
     generateFingerprint() {
-      const canvas = document.createElement('canvas')
-      const ctx = canvas.getContext('2d')
-      ctx.textBaseline = 'top'
-      ctx.font = '14px Arial'
-      ctx.fillText('Hello, visitor!', 2, 2)
-      const canvasData = canvas.toDataURL()
-
-      // 不取 userAgent（避免同一台电脑的不同浏览器被区分）
-      const components = [
-        navigator.language,
-        screen.colorDepth,
-        screen.width + 'x' + screen.height,
-        new Date().getTimezoneOffset(),
-        canvasData,
-        navigator.platform,
-        navigator.hardwareConcurrency || '',
-        navigator.deviceMemory || ''
-      ]
-
-      let hash = 0
-      const str = components.join('###')
-      for (let i = 0; i < str.length; i++) {
-        const char = str.charCodeAt(i)
-        hash = ((hash << 5) - hash) + char
-        hash = hash & hash
-      }
-      return 'fp_' + Math.abs(hash).toString(16)
+      const { generateFingerprint } = require('@/utils/deviceFingerprint')
+      return generateFingerprint()
     },
     async doConnect() {
       try {
