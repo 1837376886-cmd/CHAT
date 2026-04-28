@@ -196,22 +196,61 @@ export default {
     }
   },
   mounted() {
-    this.loadMyStatus()
-    this.loadSessions()
-    this.initWebSocket()
-    this.startWaitingPoll()
+    this.$store.dispatch('csNotice/setWorkbenchVisible', true)
+    this.initWorkbench()
+  },
+  activated() {
+    this.$store.dispatch('csNotice/setWorkbenchVisible', true)
+    this.initWorkbench()
+  },
+  deactivated() {
+    this.$store.dispatch('csNotice/setWorkbenchVisible', false)
+    this.destroyWorkbench()
   },
   beforeDestroy() {
-    if (this.wsClient) {
-      this.wsClient.close()
-    }
-    if (this.waitingPollTimer) {
-      clearInterval(this.waitingPollTimer)
-    }
+    this.$store.dispatch('csNotice/setWorkbenchVisible', false)
+    this.destroyWorkbench()
   },
   methods: {
+    initWorkbench() {
+      this.loadMyStatus().then(() => {
+        if (this.online) {
+          this.loadSessions()
+          if (!this.wsClient) {
+            this.initWebSocket()
+          }
+        } else {
+          // 客服不在线，关闭WS、清空会话列表，但保留排队轮询
+          if (this.wsClient) {
+            this.wsClient.close()
+            this.wsClient = null
+          }
+          this.activeSessions = []
+          if (this.currentSessionId) {
+            this.currentSessionId = null
+            this.currentMessages = []
+            this.visitorDetail = null
+          }
+        }
+        // 无论在线与否都启动排队轮询，让客服实时看到排队情况
+        if (!this.waitingPollTimer) {
+          this.startWaitingPoll()
+        }
+        this.$store.dispatch('csNotice/clearUnread')
+      })
+    },
+    destroyWorkbench() {
+      if (this.wsClient) {
+        this.wsClient.close()
+        this.wsClient = null
+      }
+      if (this.waitingPollTimer) {
+        clearInterval(this.waitingPollTimer)
+        this.waitingPollTimer = null
+      }
+    },
     loadMyStatus() {
-      getMyCsStatus().then(res => {
+      return getMyCsStatus().then(res => {
         const data = res.data || {}
         this.online = !!data.online
         this.maxSessions = data.maxSessions || 5
@@ -362,6 +401,11 @@ export default {
             this.currentMessages = []
             this.visitorDetail = null
           }
+          // 只关闭WS，保留排队轮询，让客服继续看到排队人数
+          if (this.wsClient) {
+            this.wsClient.close()
+            this.wsClient = null
+          }
         })
       } else {
         this.goOnline()
@@ -371,6 +415,13 @@ export default {
       csOnline().then(() => {
         this.online = true
         this.$message.success('已上线')
+        if (!this.wsClient) {
+          this.initWebSocket()
+        }
+        if (!this.waitingPollTimer) {
+          this.startWaitingPoll()
+        }
+        this.loadSessions()
       }).catch(() => {
         this.online = false
       })
@@ -426,6 +477,9 @@ export default {
         } else {
           const count = this.unreadMap[sessionId] || 0
           this.$set(this.unreadMap, sessionId, count + 1)
+          // 非当前会话收到消息：顶部铃铛+1，播放提示音
+          this.$store.dispatch('csNotice/incrementUnread')
+          this.playNotifySound()
         }
         return
       }
@@ -445,6 +499,26 @@ export default {
         return
       }
       console.warn('工作台收到未知消息类型:', msg.type)
+    },
+    playNotifySound() {
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext
+        if (!AudioCtx) return
+        const ctx = new AudioCtx()
+        const osc = ctx.createOscillator()
+        const gain = ctx.createGain()
+        osc.connect(gain)
+        gain.connect(ctx.destination)
+        osc.type = 'sine'
+        osc.frequency.setValueAtTime(880, ctx.currentTime)
+        osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.15)
+        gain.gain.setValueAtTime(0.3, ctx.currentTime)
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15)
+        osc.start(ctx.currentTime)
+        osc.stop(ctx.currentTime + 0.15)
+      } catch (e) {
+        console.warn('播放提示音失败', e)
+      }
     },
     addMessage(sessionId, msg) {
       if (!this.messageMap[sessionId]) {

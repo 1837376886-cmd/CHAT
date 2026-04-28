@@ -228,31 +228,39 @@ public class CustomerServiceAllocationService {
      * 结束会话后尝试消费等待集合
      */
     public void tryConsumeWaitingAfterClose(Long csUserId) {
-        String visitorToken = redisManager.popFromWaiting();
-        if (visitorToken == null) {
+        String lockKey = "cs:allocate:lock:" + csUserId;
+        if (!redisManager.tryLock(lockKey, 10)) {
             return;
         }
+        try {
+            String visitorToken = redisManager.popFromWaiting();
+            if (visitorToken == null) {
+                return;
+            }
 
-        ChatVisitor visitor = chatVisitorService.selectByVisitorToken(visitorToken);
-        if (visitor == null) {
-            return;
+            ChatVisitor visitor = chatVisitorService.selectByVisitorToken(visitorToken);
+            if (visitor == null) {
+                return;
+            }
+
+            // 检查该客服是否还有容量（加锁后二次确认，防止并发超额分配）
+            int active = redisManager.getActiveCount(csUserId);
+            int max = getMaxSessions(csUserId);
+            if (active >= max) {
+                // 没有容量了，把访客加回去
+                redisManager.addToWaiting(visitorToken);
+                return;
+            }
+
+            SysUser cs = sysUserMapper.selectUserById(csUserId);
+            AllocationResult result = createSessionAndAssign(visitor, csUserId,
+                    cs != null ? cs.getNickName() : "客服");
+
+            // TODO: 通过WebSocket推送分配成功消息给访客
+            // 这里暂时不处理WebSocket推送，留给消息路由层处理
+        } finally {
+            redisManager.unlock(lockKey);
         }
-
-        // 检查该客服是否还有容量
-        int active = redisManager.getActiveCount(csUserId);
-        int max = getMaxSessions(csUserId);
-        if (active >= max) {
-            // 没有容量了，把访客加回去
-            redisManager.addToWaiting(visitorToken);
-            return;
-        }
-
-        SysUser cs = sysUserMapper.selectUserById(csUserId);
-        AllocationResult result = createSessionAndAssign(visitor, csUserId,
-                cs != null ? cs.getNickName() : "客服");
-
-        // TODO: 通过WebSocket推送分配成功消息给访客
-        // 这里暂时不处理WebSocket推送，留给消息路由层处理
     }
 
     /**

@@ -16,6 +16,8 @@ const getters = {
   permission_routes: state => state.permission.routes,
   topbarRouters: state => state.permission.topbarRouters,
   defaultRoutes: state => state.permission.defaultRoutes,
-  sidebarRouters: state => state.permission.sidebarRouters
+  sidebarRouters: state => state.permission.sidebarRouters,
+  csUnreadCount: state => state.csNotice.unreadCount,
+  csHasNewMessage: state => state.csNotice.hasNewMessage
 }
 export default getters

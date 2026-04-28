@@ -46,6 +46,9 @@ public class ChatConnectionManager {
             userChannels.remove(userId);
             channelUsers.remove(oldChannel.id().asShortText());
             allChannels.remove(oldChannel);
+            if (oldChannel.isActive()) {
+                oldChannel.close();
+            }
             log.info("用户 {} 的旧连接 {} 已被新连接替换", userId, oldChannel.id().asShortText());
         }
         

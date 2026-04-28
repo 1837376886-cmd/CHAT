@@ -360,6 +360,10 @@ public class ChatChannelHandler extends SimpleChannelInboundHandler<TextWebSocke
     }
 
     private void handleHeartbeat(ChannelHandlerContext ctx, ChatMessage message) {
+        Long userId = ctx.channel().attr(USER_ID_KEY).get();
+        if (userId != null) {
+            redisManager.updateHeartbeat(userId);
+        }
         ChatMessage response = new ChatMessage(MessageType.HEARTBEAT_RESPONSE);
         response.setMessageId(UUID.randomUUID().toString());
         sendMessage(ctx, response);

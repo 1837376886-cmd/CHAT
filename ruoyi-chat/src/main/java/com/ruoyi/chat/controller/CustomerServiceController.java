@@ -5,8 +5,10 @@ import com.ruoyi.chat.domain.entity.CsConfig;
 import com.ruoyi.chat.domain.entity.CsMessage;
 import com.ruoyi.chat.domain.entity.CsSession;
 import com.ruoyi.chat.service.*;
+import com.ruoyi.common.annotation.RateLimiter;
 import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.core.domain.entity.SysUser;
+import com.ruoyi.common.enums.LimitType;
 import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.system.service.ISysUserService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -57,6 +59,7 @@ public class CustomerServiceController {
      * 访客接入
      */
     @PostMapping("/connect")
+    @RateLimiter(time = 5, count = 3, limitType = LimitType.IP)
     public AjaxResult connect(@RequestBody Map<String, String> params,
                                HttpServletRequest request) {
         String visitorToken = params.get("visitorToken");
@@ -106,6 +109,7 @@ public class CustomerServiceController {
      * 访客发送消息
      */
     @PostMapping("/message/send")
+    @RateLimiter(time = 5, count = 3, limitType = LimitType.IP)
     public AjaxResult sendMessage(@RequestBody Map<String, Object> params) {
         String visitorToken = (String) params.get("visitorToken");
         Long sessionId = Long.valueOf(params.get("sessionId").toString());
@@ -389,7 +393,7 @@ public class CustomerServiceController {
         Map<String, Object> data = new HashMap<>();
         data.put("id", visitor.getId());
         data.put("nickname", visitor.getNickname());
-        data.put("ip", visitor.getIp());
+        data.put("ip", maskIp(visitor.getIp()));
         data.put("userAgent", visitor.getUserAgent());
         data.put("sourcePage", visitor.getSourcePage());
         data.put("deviceFingerprint", visitor.getDeviceFingerprint());
@@ -663,6 +667,30 @@ public class CustomerServiceController {
     }
 
     // ==================== 工具方法 ====================
+
+    /**
+     * IP 脱敏：仅保留前两段，后面用 .* 替代（如 192.168.x.x）
+     */
+    private String maskIp(String ip) {
+        if (ip == null || ip.isEmpty()) {
+            return ip;
+        }
+        // IPv4
+        if (ip.indexOf('.') > 0) {
+            String[] parts = ip.split("\\.");
+            if (parts.length >= 2) {
+                return parts[0] + "." + parts[1] + ".*.*";
+            }
+        }
+        // IPv6 简化为前32位
+        if (ip.indexOf(':') > 0) {
+            String[] parts = ip.split(":");
+            if (parts.length >= 2) {
+                return parts[0] + ":" + parts[1] + ":*:*:*:*:*:*:*";
+            }
+        }
+        return ip;
+    }
 
     private String getClientIp(HttpServletRequest request) {
         String ip = request.getHeader("X-Forwarded-For");

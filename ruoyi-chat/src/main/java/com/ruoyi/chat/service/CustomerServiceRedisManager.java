@@ -118,6 +118,32 @@ public class CustomerServiceRedisManager {
         return result;
     }
 
+    /**
+     * 获取所有客服状态Redis键
+     */
+    public Collection<String> getAllCsStatusKeys() {
+        return redisCache.keys(CS_STATUS_PREFIX + "*");
+    }
+
+    /**
+     * 获取客服最后心跳时间
+     */
+    public Long getLastHeartbeat(Long csUserId) {
+        String key = CS_STATUS_PREFIX + csUserId;
+        Object val = redisCache.getCacheMapValue(key, "lastHeartbeat");
+        if (val == null) {
+            return null;
+        }
+        if (val instanceof Long) {
+            return (Long) val;
+        }
+        try {
+            return Long.valueOf(val.toString());
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
     // ==================== 等待集合 ====================
 
     /**
@@ -235,5 +261,22 @@ public class CustomerServiceRedisManager {
         int active = getActiveCount(csUserId);
         int max = getMaxSessions(csUserId);
         return active < max;
+    }
+
+    // ==================== 分布式锁 ====================
+
+    /**
+     * 尝试获取分布式锁（SETNX）
+     */
+    public boolean tryLock(String lockKey, long expireSeconds) {
+        Boolean success = redisCache.redisTemplate.opsForValue().setIfAbsent(lockKey, "1", expireSeconds, TimeUnit.SECONDS);
+        return Boolean.TRUE.equals(success);
+    }
+
+    /**
+     * 释放分布式锁
+     */
+    public void unlock(String lockKey) {
+        redisCache.deleteObject(lockKey);
     }
 }

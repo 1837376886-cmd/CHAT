@@ -161,6 +161,19 @@ export const dynamicRoutes = [
         meta: { title: '修改生成配置', activeMenu: '/tool/gen' }
       }
     ]
+  },
+  {
+    path: '/cs/workbench',
+    component: Layout,
+    hidden: true,
+    children: [
+      {
+        path: '',
+        component: () => import('@/views/cs/workbench/index'),
+        name: 'CsWorkbench',
+        meta: { title: '客服工作台' }
+      }
+    ]
   }
 ]
 

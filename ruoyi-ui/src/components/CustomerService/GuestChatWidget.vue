@@ -52,39 +52,45 @@
       </div>
 
       <div v-if="confirmed" class="cs-chat-footer">
-        <div class="cs-input-wrap">
-          <div class="cs-toolbar">
-            <i class="el-icon-s-grid cs-toolbar-btn" title="表情" @click="toggleEmoji"></i>
-          </div>
-          <div v-if="emojiVisible" class="cs-emoji-picker">
-            <div class="cs-emoji-grid">
-              <span
-                v-for="(emoji, idx) in emojiList"
-                :key="idx"
-                class="cs-emoji-item"
-                @click="selectEmoji(emoji)"
-              >
-                {{ emoji }}
-              </span>
-            </div>
-          </div>
-          <el-input
-            v-model="inputMessage"
-            type="textarea"
-            :rows="2"
-            placeholder="请输入您的问题..."
-            :disabled="inputDisabled"
-            @keyup.enter.native="handleSend"
-          />
+        <div v-if="sessionEnded" class="cs-session-ended-bar">
+          <span class="cs-ended-tip">会话已结束</span>
+          <el-button type="primary" size="small" @click="reconnect">重新咨询</el-button>
         </div>
-        <el-button
-          type="primary"
-          size="small"
-          :disabled="inputDisabled || !inputMessage.trim()"
-          @click="handleSend"
-        >
-          发送
-        </el-button>
+        <template v-else>
+          <div class="cs-input-wrap">
+            <div class="cs-toolbar">
+              <i class="el-icon-s-grid cs-toolbar-btn" title="表情" @click="toggleEmoji"></i>
+            </div>
+            <div v-if="emojiVisible" class="cs-emoji-picker">
+              <div class="cs-emoji-grid">
+                <span
+                  v-for="(emoji, idx) in emojiList"
+                  :key="idx"
+                  class="cs-emoji-item"
+                  @click="selectEmoji(emoji)"
+                >
+                  {{ emoji }}
+                </span>
+              </div>
+            </div>
+            <el-input
+              v-model="inputMessage"
+              type="textarea"
+              :rows="2"
+              placeholder="请输入您的问题..."
+              :disabled="inputDisabled"
+              @keyup.enter.native="handleSend"
+            />
+          </div>
+          <el-button
+            type="primary"
+            size="small"
+            :disabled="inputDisabled || !inputMessage.trim()"
+            @click="handleSend"
+          >
+            发送
+          </el-button>
+        </template>
       </div>
     </div>
   </div>
@@ -113,6 +119,7 @@ export default {
       statusMessage: '',
       inputMessage: '',
       messages: [],
+      sessionEnded: false,
       wsClient: null,
       wsConnected: false,
       reconnectTimer: null,
@@ -122,7 +129,7 @@ export default {
   },
   computed: {
     inputDisabled() {
-      return this.waiting || this.waitingForLastCs
+      return this.waiting || this.waitingForLastCs || this.sessionEnded
     }
   },
   beforeDestroy() {
@@ -283,12 +290,14 @@ export default {
           this.csUserId = null
           this.waiting = false
           this.waitingForLastCs = false
-          // 保留聊天界面和消息记录，仅禁用输入，让用户看到结束提示后可重新咨询
+          this.sessionEnded = true
+          // 保留聊天界面和消息记录，禁用输入并显示重新咨询按钮
         }
       }
       if (msg.type === MessageType.ERROR) {
         if (msg.content === '会话不存在或已结束') {
           this.sessionId = null
+          this.sessionEnded = true
         }
         this.$message.error(msg.content || '发送失败')
       }
@@ -318,6 +327,10 @@ export default {
       if (!content || this.inputDisabled) return
 
       if (!this.sessionId) {
+        if (this.sessionEnded) {
+          this.$message.info('会话已结束，请点击"重新咨询"按钮')
+          return
+        }
         await this.doConnect()
         if (!this.sessionId) {
           this.$message.warning('暂时无法连接客服，请稍后重试')
@@ -343,6 +356,11 @@ export default {
       })
       this.inputMessage = ''
       this.scrollToBottom()
+    },
+    reconnect() {
+      this.sessionEnded = false
+      this.messages = []
+      this.doConnect()
     },
     scrollToBottom() {
       this.$nextTick(() => {
@@ -598,5 +616,18 @@ export default {
 .cs-msg-content.emoji-only {
   font-size: 28px;
   line-height: 1.2;
+}
+.cs-session-ended-bar {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: #f5f7fa;
+  border-radius: 4px;
+}
+.cs-ended-tip {
+  color: #909399;
+  font-size: 13px;
 }
 </style>

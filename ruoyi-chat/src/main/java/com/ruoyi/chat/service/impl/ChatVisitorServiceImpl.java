@@ -37,9 +37,9 @@ public class ChatVisitorServiceImpl extends ServiceImpl<ChatVisitorMapper, ChatV
                 return visitor;
             }
         }
-        // 3. 按IP兜底（最近7天）
-        ChatVisitor visitor = chatVisitorMapper.selectRecentByIp(ip, 7);
-        if (visitor != null) {
+        // 3. 按IP+UA弱指纹兜底（最近1天，降低共用IP误判风险）
+        ChatVisitor visitor = chatVisitorMapper.selectRecentByIp(ip, 1);
+        if (visitor != null && isWeakUaMatch(userAgent, visitor.getUserAgent())) {
             return visitor;
         }
         // 4. 创建新访客
@@ -94,5 +94,20 @@ public class ChatVisitorServiceImpl extends ServiceImpl<ChatVisitorMapper, ChatV
     @Override
     public ChatVisitor selectByDeviceFingerprint(String deviceFingerprint, int days) {
         return chatVisitorMapper.selectByDeviceFingerprint(deviceFingerprint, days);
+    }
+
+    /**
+     * UA 弱指纹匹配：取前30个字符比较（通常包含浏览器内核和操作系统信息）
+     * 用于降低共用公网 IP 的误判风险
+     */
+    private boolean isWeakUaMatch(String currentUa, String storedUa) {
+        if (currentUa == null || storedUa == null) {
+            return false;
+        }
+        int len = Math.min(30, Math.min(currentUa.length(), storedUa.length()));
+        if (len == 0) {
+            return false;
+        }
+        return currentUa.substring(0, len).equalsIgnoreCase(storedUa.substring(0, len));
     }
 }

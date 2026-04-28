@@ -7,6 +7,7 @@ class ChatWebSocket {
         this.reconnectInterval = options.reconnectInterval || 3000;
         this.heartbeatInterval = options.heartbeatInterval || 30000;
         this.heartbeatTimer = null;
+        this.destroyed = false;
 
         this.onOpen = options.onOpen || (() => {});
         this.onMessage = options.onMessage || (() => {});
@@ -66,11 +67,17 @@ class ChatWebSocket {
     }
 
     handleReconnect() {
+        if (this.destroyed) {
+            console.log('WebSocket 已销毁，跳过重连');
+            return;
+        }
         if (this.reconnectAttempts < this.maxReconnectAttempts) {
             this.reconnectAttempts++;
             console.log(`尝试重连 (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
             setTimeout(() => {
-                this.connect();
+                if (!this.destroyed) {
+                    this.connect();
+                }
             }, this.reconnectInterval);
         } else {
             console.error('WebSocket 重连失败，已达到最大重连次数');
@@ -108,9 +115,11 @@ class ChatWebSocket {
     }
 
     close() {
+        this.destroyed = true;
         this.stopHeartbeat();
         if (this.ws) {
             this.ws.close();
+            this.ws = null;
         }
     }
 }

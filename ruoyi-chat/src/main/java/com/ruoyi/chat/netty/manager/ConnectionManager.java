@@ -61,7 +61,11 @@ public class ConnectionManager {
         // 如果用户已经有连接，先移除旧连接
         UserSession existingSession = userSessions.get(userId);
         if (existingSession != null) {
-            removeConnection(existingSession.getChannel().id());
+            Channel oldChannel = existingSession.getChannel();
+            removeConnection(oldChannel.id());
+            if (oldChannel != null && oldChannel.isActive()) {
+                oldChannel.close();
+            }
             logger.info("用户 {} 的旧连接已被新连接替换", userId);
         }
 

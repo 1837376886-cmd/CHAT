@@ -76,20 +76,20 @@ public class WebSocketHandler extends SimpleChannelInboundHandler<WebSocketFrame
     @Override
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
         logger.debug("WebSocket连接断开: {}", ctx.channel().id());
-        
+
         // 获取用户会话信息
         UserSession userSession = connectionManager.getUserSessionByChannel(ctx.channel().id());
         if (userSession != null) {
             Long userId = userSession.getUserId();
             SysUser user = sysUserService.selectUserById(userId);
             if (user != null && Integer.valueOf(1).equals(user.getIsCustomerService())) {
-                redisManager.setCsStatus(userId, "offline", redisManager.getMaxSessions(userId));
-                logger.info("客服下线: {} ({})", userSession.getUserNickname(), userId);
+                // 客服异常断线不立即标记为offline，由定时任务根据心跳超时处理（保留会话5分钟）
+                logger.info("客服WS断开: {} ({}), 不修改Redis在线状态，由心跳检查任务处理", user.getNickName(), userId);
             }
             // 发送用户下线通知
             messageRouter.sendUserStatusNotification(userId, "offline");
         }
-        
+
         // 移除连接
         connectionManager.removeConnection(ctx.channel().id());
         super.channelInactive(ctx);
@@ -409,11 +409,17 @@ public class WebSocketHandler extends SimpleChannelInboundHandler<WebSocketFrame
      * 处理心跳消息
      */
     private void handleHeartbeat(ChannelHandlerContext ctx, ChatMessage message) {
+        // 更新客服心跳时间（如果已认证）
+        UserSession userSession = connectionManager.getUserSessionByChannel(ctx.channel().id());
+        if (userSession != null && userSession.getUserId() != null) {
+            redisManager.updateHeartbeat(userSession.getUserId());
+        }
+
         // 发送心跳响应
         ChatMessage heartbeatResponse = new ChatMessage();
         heartbeatResponse.setType(MessageType.HEARTBEAT_RESPONSE);
         heartbeatResponse.setTimestamp(new Date());
-        
+
         ctx.channel().writeAndFlush(new TextWebSocketFrame(JSON.toJSONString(heartbeatResponse)));
     }
 

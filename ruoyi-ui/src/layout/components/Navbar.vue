@@ -7,6 +7,13 @@
 
     <div class="right-menu">
       <template v-if="device!=='mobile'">
+        <!-- 客服消息通知铃铛 -->
+        <div v-if="isCustomerService" class="right-menu-item hover-effect cs-notice-bell" @click="goToCsWorkbench">
+          <el-badge :value="csUnreadCount" :hidden="csUnreadCount === 0" class="cs-badge">
+            <i class="el-icon-bell" :class="{ 'cs-bell-shake': csHasNewMessage }" @animationend="onBellAnimationEnd"></i>
+          </el-badge>
+        </div>
+
         <search id="header-search" class="right-menu-item" />
 
         <el-tooltip content="源码地址" effect="dark" placement="bottom">
@@ -75,8 +82,13 @@ export default {
       'sidebar',
       'avatar',
       'device',
-      'nickName'
+      'nickName',
+      'csUnreadCount',
+      'csHasNewMessage'
     ]),
+    isCustomerService() {
+      return this.$store.state.user.isCustomerService === 1
+    },
     setting: {
       get() {
         return this.$store.state.settings.showSettings
@@ -94,6 +106,13 @@ export default {
     },
     setLayout(event) {
       this.$emit('setLayout')
+    },
+    goToCsWorkbench() {
+      this.$router.push('/cs/workbench')
+      this.$store.dispatch('csNotice/clearUnread')
+    },
+    onBellAnimationEnd() {
+      this.$store.dispatch('csNotice/resetNewFlag')
     },
     logout() {
       this.$confirm('确定注销并退出系统吗？', '提示', {
@@ -117,6 +136,24 @@ export default {
   position: relative;
   background: #fff;
   box-shadow: 0 1px 4px rgba(0,21,41,.08);
+
+  .cs-notice-bell {
+    position: relative;
+    .el-icon-bell {
+      font-size: 20px;
+      color: #5a5e66;
+    }
+    .cs-bell-shake {
+      animation: bellShake 0.8s cubic-bezier(.36,.07,.19,.97) both;
+      color: #f56c6c;
+    }
+  }
+
+  @keyframes bellShake {
+    0%, 100% { transform: rotate(0); }
+    10%, 30%, 50%, 70%, 90% { transform: rotate(-10deg); }
+    20%, 40%, 60%, 80% { transform: rotate(10deg); }
+  }
 
   .hamburger-container {
     line-height: 46px;
