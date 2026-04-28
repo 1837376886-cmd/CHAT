@@ -215,7 +215,10 @@ export default {
           this.csUserId = data.csUserId
           this.csNickname = data.csNickname
           this.initWebSocket()
-          this.loadHistory()
+          // 只有当前没有消息时才加载历史，避免覆盖已有消息（如转接后）
+          if (this.messages.length === 0) {
+            this.loadHistory()
+          }
         } else if (this.waiting || this.waitingForLastCs) {
           this.initWebSocket()
           // 等待状态下定时重试分配
@@ -264,6 +267,17 @@ export default {
         console.log('访客WS认证成功')
         return
       }
+      if (msg.type === MessageType.AUTH_FAILED) {
+        this.$message.error(msg.content || '认证失败')
+        // 认证失败时关闭WebSocket，下次发消息会重新连接并走重新咨询流程
+        if (this.wsClient) {
+          this.wsClient.close()
+          this.wsClient = null
+        }
+        this.wsConnected = false
+        this.sessionEnded = true
+        return
+      }
       if (msg.type === MessageType.CS_CHAT) {
         this.messages.push({
           sender: msg.fromUserNickname || '客服',
@@ -294,15 +308,36 @@ export default {
           // 保留聊天界面和消息记录，禁用输入并显示重新咨询按钮
         }
       }
+      if (msg.type === MessageType.CS_TRANSFER_RESULT) {
+        // 会话已转接，更新sessionId并显示系统消息
+        const newSessionId = msg.sessionId ? parseInt(msg.sessionId) : null
+        if (newSessionId) {
+          this.sessionId = newSessionId
+        }
+        this.csNickname = msg.fromUserNickname || '客服'
+        this.csUserId = null // 清空后由后续消息填充
+        this.sessionEnded = false
+        this.messages.push({
+          sender: '系统',
+          content: msg.content || '您的会话已转接给新的客服',
+          time: this.formatTime(new Date()),
+          isSelf: false,
+          isSystem: true
+        })
+        this.scrollToBottom()
+        return
+      }
       if (msg.type === MessageType.ERROR) {
         if (msg.content === '会话不存在或已结束') {
-          this.sessionId = null
-          this.sessionEnded = true
+          // 会话可能已转接或刚结束，尝试重新连接，不直接置为结束
+          this.doConnect().then(() => {
+            if (!this.sessionId) {
+              this.sessionEnded = true
+            }
+          })
+        } else {
+          this.$message.error(msg.content || '发送失败')
         }
-        this.$message.error(msg.content || '发送失败')
-      }
-      if (msg.type === MessageType.AUTH_SUCCESS) {
-        console.log('访客WS认证成功')
       }
     },
     async loadHistory() {

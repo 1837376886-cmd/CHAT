@@ -30,6 +30,7 @@
           </div>
           <div v-if="unreadMap[session.id]" class="cs-unread-badge">{{ unreadMap[session.id] }}</div>
           <div class="cs-session-actions">
+            <el-button size="mini" type="warning" @click.stop="openTransferDialog(session)">转接</el-button>
             <el-button size="mini" type="danger" @click.stop="closeSession(session.id)">结束</el-button>
           </div>
         </div>
@@ -68,7 +69,7 @@
                 <div class="cs-msg-content" :class="{ 'emoji-only': isPureEmoji(msg.content) }">{{ msg.content }}</div>
                 <div class="cs-msg-time">{{ msg.time }}</div>
               </div>
-              <div v-if="msg.isSelf" class="cs-msg-avatar cs-avatar-cs">我</div>
+              <div v-if="msg.isSelf" class="cs-msg-avatar cs-avatar-cs">{{ msg.isMe ? '我' : (msg.sender ? msg.sender.charAt(0) : '客') }}</div>
             </template>
           </div>
         </div>
@@ -107,6 +108,34 @@
         </div>
       </div>
     </div>
+
+    <!-- 转接弹窗 -->
+    <el-dialog title="转接会话" :visible.sync="transferDialogVisible" width="400px" @closed="resetTransferDialog">
+      <el-form label-width="80px">
+        <el-form-item label="目标客服">
+          <el-select v-model="transferTargetId" placeholder="请选择客服" style="width: 100%">
+            <el-option
+              v-for="staff in onlineStaffList"
+              :key="staff.userId"
+              :label="staff.nickName + ' (' + staff.activeCount + '/' + staff.maxSessions + ')'"
+              :value="staff.userId"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="转接原因">
+          <el-input
+            v-model="transferReason"
+            type="textarea"
+            :rows="3"
+            placeholder="请输入转接原因（对方客服可见）"
+          />
+        </el-form-item>
+      </el-form>
+      <span slot="footer" class="dialog-footer">
+        <el-button @click="transferDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="transferLoading" @click="submitTransfer">确定转接</el-button>
+      </span>
+    </el-dialog>
 
     <!-- 右侧访客信息 -->
     <div class="cs-info-panel">
@@ -164,7 +193,7 @@
 </template>
 
 <script>
-import { getWorkbenchSessions, closeCsSession, csOnline, csOffline, getCsSessionMessages, readCsSession, getWaitingCount, getVisitorHistoryMessages, getMyCsStatus, getVisitorDetail } from '@/api/cs'
+import { getWorkbenchSessions, closeCsSession, csOnline, csOffline, getCsSessionMessages, readCsSession, getWaitingCount, getVisitorHistoryMessages, getMyCsStatus, getVisitorDetail, getOnlineStaff, requestTransfer, acceptTransfer, rejectTransfer } from '@/api/cs'
 import { WS_URL, MessageType } from '@/utils/chatConstants'
 import ChatWebSocket from '@/utils/chatWebSocket'
 import { getToken } from '@/utils/auth'
@@ -187,7 +216,13 @@ export default {
       waitingPollTimer: null,
       emojiVisible: false,
       emojiList: emojiList,
-      visitorDetail: null
+      visitorDetail: null,
+      transferDialogVisible: false,
+      transferTargetId: null,
+      transferReason: '',
+      onlineStaffList: [],
+      transferSessionId: null,
+      transferLoading: false
     }
   },
   computed: {
@@ -307,11 +342,13 @@ export default {
       const session = this.activeSessions.find(s => s.id === sessionId)
       getCsSessionMessages(sessionId).then(res => {
         const list = res.data || []
+        const currentUserId = Number(this.$store.state.user.id)
         const currentMapped = list.map(item => ({
           sender: item.senderName || (item.fromType === 2 ? '我' : (item.fromType === 1 ? '访客' : '系统')),
           content: item.content,
           time: this.formatTime(item.createTime),
           isSelf: item.fromType === 2,
+          isMe: item.fromType === 2 && Number(item.fromUserId) === currentUserId,
           isSystem: item.fromType === 3
         }))
         if (!session || !session.visitorId) {
@@ -329,6 +366,7 @@ export default {
               content: item.content,
               time: this.formatTime(item.createTime),
               isSelf: item.fromType === 2,
+              isMe: item.fromType === 2 && Number(item.fromUserId) === currentUserId,
               isSystem: item.fromType === 3,
               isHistory: true
             }))
@@ -366,7 +404,8 @@ export default {
           sender: '我',
           content: content,
           time: this.formatTime(new Date()),
-          isSelf: true
+          isSelf: true,
+          isMe: true
         })
         this.inputMessage = ''
       } else {
@@ -461,11 +500,15 @@ export default {
       }
       if (msg.type === MessageType.CS_CHAT) {
         const sessionId = parseInt(msg.sessionId)
+        const currentUserId = Number(this.$store.state.user.id)
+        const fromUserId = Number(msg.fromUserId) || 0
+        const isCs = fromUserId > 0 && msg.fromUserNickname !== '访客'
         this.addMessage(sessionId, {
           sender: msg.fromUserNickname || '访客',
           content: msg.content,
           time: this.formatTime(new Date()),
-          isSelf: false
+          isSelf: isCs,
+          isMe: fromUserId === currentUserId
         })
         if (!this.activeSessions.find(s => s.id === sessionId)) {
           this.loadSessions()
@@ -496,6 +539,18 @@ export default {
         }
         this.$message.info(msg.content)
         this.loadSessions()
+        return
+      }
+      if (msg.type === MessageType.CS_TRANSFER_REQUEST) {
+        this.handleTransferRequest(msg)
+        return
+      }
+      if (msg.type === MessageType.CS_TRANSFER_ACCEPT) {
+        this.handleTransferAccept(msg)
+        return
+      }
+      if (msg.type === MessageType.CS_TRANSFER_REJECT) {
+        this.handleTransferReject(msg)
         return
       }
       console.warn('工作台收到未知消息类型:', msg.type)
@@ -586,6 +641,106 @@ export default {
     },
     isPureEmoji(content) {
       return isPureEmoji(content)
+    },
+    openTransferDialog(session) {
+      this.transferSessionId = session.id
+      this.transferDialogVisible = true
+      this.transferLoading = true
+      getOnlineStaff().then(res => {
+        this.onlineStaffList = res.data || []
+      }).catch(() => {
+        this.$message.error('获取在线客服列表失败')
+      }).finally(() => {
+        this.transferLoading = false
+      })
+    },
+    resetTransferDialog() {
+      this.transferTargetId = null
+      this.transferReason = ''
+      this.transferSessionId = null
+      this.onlineStaffList = []
+    },
+    submitTransfer() {
+      if (!this.transferTargetId) {
+        this.$message.warning('请选择目标客服')
+        return
+      }
+      this.transferLoading = true
+      requestTransfer({
+        sessionId: this.transferSessionId,
+        targetCsUserId: this.transferTargetId,
+        reason: this.transferReason
+      }).then(() => {
+        this.$message.success('转接请求已发送，等待对方确认')
+        this.transferDialogVisible = false
+      }).catch(err => {
+        this.$message.error(err.response?.data?.msg || '转接请求发送失败')
+      }).finally(() => {
+        this.transferLoading = false
+      })
+    },
+    handleTransferRequest(msg) {
+      const transferId = msg.messageId
+      const fromCsNickname = msg.fromUserNickname || '客服'
+      const visitorNickname = msg.extra?.visitorNickname || '访客'
+      const reason = msg.content || ''
+      const h = this.$createElement
+      const notifyInstance = this.$notify({
+        title: '收到转接请求',
+        message: h('div', [
+          h('p', `${fromCsNickname} 希望将访客 ${visitorNickname} 转接给您`),
+          reason ? h('p', `原因：${reason}`) : null,
+          h('div', { style: 'margin-top: 10px; text-align: right;' }, [
+            h('el-button', {
+              props: { size: 'mini' },
+              on: {
+                click: () => {
+                  notifyInstance.close()
+                  rejectTransfer({ transferId }).then(() => {
+                    this.$message.info('已拒绝转接请求')
+                  }).catch(() => {
+                    this.$message.error('操作失败')
+                  })
+                }
+              }
+            }, '拒绝'),
+            h('el-button', {
+              props: { size: 'mini', type: 'primary' },
+              on: {
+                click: () => {
+                  notifyInstance.close()
+                  acceptTransfer({ transferId }).then(() => {
+                    this.$message.success('已接受转接')
+                    this.loadSessions()
+                  }).catch(err => {
+                    this.$message.error(err.response?.data?.msg || '接受转接失败')
+                  })
+                }
+              }
+            }, '接受')
+          ])
+        ]),
+        duration: 0,
+        position: 'top-right'
+      })
+    },
+    handleTransferAccept(msg) {
+      const sessionId = parseInt(msg.sessionId)
+      const newSessionId = msg.extra?.newSessionId
+      const toCsNickname = msg.extra?.toCsNickname || '客服'
+      this.$message.success(`会话已成功转接给 ${toCsNickname}`)
+      // 从列表中移除该会话
+      this.activeSessions = this.activeSessions.filter(s => s.id !== sessionId)
+      delete this.messageMap[sessionId]
+      delete this.unreadMap[sessionId]
+      if (this.currentSessionId === sessionId) {
+        this.currentSessionId = null
+        this.currentMessages = []
+        this.visitorDetail = null
+      }
+    },
+    handleTransferReject() {
+      this.$message.warning('对方拒绝了转接请求')
     },
     formatFullTime(timeStr) {
       if (!timeStr) return '-'

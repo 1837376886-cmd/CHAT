@@ -46,5 +46,17 @@ public enum MessageType {
     SYSTEM_NOTICE,
     
     /** 错误消息 */
-    ERROR
+    ERROR,
+
+    /** 转接请求 */
+    CS_TRANSFER_REQUEST,
+
+    /** 转接接受 */
+    CS_TRANSFER_ACCEPT,
+
+    /** 转接拒绝 */
+    CS_TRANSFER_REJECT,
+
+    /** 转接结果通知（推送给访客） */
+    CS_TRANSFER_RESULT
 }

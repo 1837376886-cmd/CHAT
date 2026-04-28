@@ -154,3 +154,34 @@ export function getVisitorDetail(visitorId) {
     method: 'get'
   })
 }
+
+export function getOnlineStaff() {
+  return request({
+    url: '/cs/onlineStaff',
+    method: 'get'
+  })
+}
+
+export function requestTransfer(data) {
+  return request({
+    url: '/cs/transfer/request',
+    method: 'post',
+    data
+  })
+}
+
+export function acceptTransfer(data) {
+  return request({
+    url: '/cs/transfer/accept',
+    method: 'post',
+    data
+  })
+}
+
+export function rejectTransfer(data) {
+  return request({
+    url: '/cs/transfer/reject',
+    method: 'post',
+    data
+  })
+}

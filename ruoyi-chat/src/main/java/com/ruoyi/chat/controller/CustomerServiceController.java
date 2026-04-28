@@ -15,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletRequest;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -76,8 +77,11 @@ public class CustomerServiceController {
 
         CustomerServiceAllocationService.AllocationResult result = allocationService.allocate(visitor);
 
+        // 必须使用数据库中访客的实际token（getOrCreateVisitor可能按设备指纹/IP复用了旧访客）
+        String actualToken = visitor.getVisitorToken();
+
         Map<String, Object> data = new HashMap<>();
-        data.put("visitorToken", visitorToken);
+        data.put("visitorToken", actualToken);
         data.put("success", result.isSuccess());
         data.put("waiting", result.isWaiting());
         data.put("waitingForLastCs", result.isWaitingForLastCs());
@@ -86,7 +90,7 @@ public class CustomerServiceController {
         data.put("csNickname", result.getCsNickname());
         data.put("message", result.getMessage());
         if (result.isWaiting()) {
-            data.put("waitingPosition", redisManager.getWaitingPosition(visitorToken));
+            data.put("waitingPosition", redisManager.getWaitingPosition(actualToken));
         }
 
         return AjaxResult.success(data);
@@ -407,7 +411,7 @@ public class CustomerServiceController {
     }
 
     /**
-     * 客服查看访客的所有历史消息
+     * 客服查看访客的所有历史消息（支持跨客服查看，用于协作）
      */
     @GetMapping("/visitor/{visitorId}/messages")
     public AjaxResult getVisitorHistoryMessages(@PathVariable Long visitorId) {
@@ -415,15 +419,14 @@ public class CustomerServiceController {
         if (!Integer.valueOf(1).equals(user.getIsCustomerService())) {
             return AjaxResult.error("无权访问");
         }
-        // 校验该访客是否有进行中的会话属于当前客服
-        CsSession activeSession = csSessionService.selectActiveSessionByVisitorId(visitorId);
-        if (activeSession == null || !activeSession.getCsUserId().equals(user.getUserId())) {
-            return AjaxResult.error("无权查看");
+        // 放宽权限：客服可查看任意访客的历史消息，只要访客存在
+        ChatVisitor visitor = chatVisitorService.getById(visitorId);
+        if (visitor == null) {
+            return AjaxResult.error("访客不存在");
         }
         List<CsMessage> messages = csMessageService.selectMessagesByVisitorId(visitorId);
 
         // 填充发送者名称
-        ChatVisitor visitor = chatVisitorService.getById(visitorId);
         String visitorName = null;
         if (visitor != null) {
             if (visitor.getBoundUserId() != null) {
@@ -663,6 +666,208 @@ public class CustomerServiceController {
             redisManager.setCsStatus(userId, redisManager.getCsStatus(userId), maxSessions);
         }
 
+        return AjaxResult.success();
+    }
+
+    // ==================== 转接功能接口 ====================
+
+    /**
+     * 查询当前在线且有容量的客服列表（用于转接选择）
+     */
+    @GetMapping("/onlineStaff")
+    public AjaxResult getOnlineStaff() {
+        SysUser user = SecurityUtils.getLoginUser().getUser();
+        if (!Integer.valueOf(1).equals(user.getIsCustomerService())) {
+            return AjaxResult.error("无权访问");
+        }
+        List<Long> onlineIds = redisManager.getOnlineCsUserIds();
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (Long csId : onlineIds) {
+            if (csId.equals(user.getUserId())) {
+                continue; // 排除自己
+            }
+            int active = redisManager.getActiveCount(csId);
+            int max = redisManager.getMaxSessions(csId);
+            if (active < max) {
+                SysUser cs = sysUserService.selectUserById(csId);
+                if (cs != null) {
+                    Map<String, Object> map = new HashMap<>();
+                    map.put("userId", csId);
+                    map.put("nickName", cs.getNickName());
+                    map.put("activeCount", active);
+                    map.put("maxSessions", max);
+                    result.add(map);
+                }
+            }
+        }
+        return AjaxResult.success(result);
+    }
+
+    /**
+     * 发起转接请求
+     */
+    @PostMapping("/transfer/request")
+    public AjaxResult requestTransfer(@RequestBody Map<String, Object> params) {
+        SysUser user = SecurityUtils.getLoginUser().getUser();
+        if (!Integer.valueOf(1).equals(user.getIsCustomerService())) {
+            return AjaxResult.error("无权访问");
+        }
+        Long sessionId = Long.valueOf(params.get("sessionId").toString());
+        Long targetCsUserId = Long.valueOf(params.get("targetCsUserId").toString());
+        String reason = (String) params.get("reason");
+
+        CsSession session = csSessionService.getById(sessionId);
+        if (session == null || !Integer.valueOf(CsSession.Status.ACTIVE).equals(session.getStatus())) {
+            return AjaxResult.error("会话不存在或已结束");
+        }
+        if (!session.getCsUserId().equals(user.getUserId())) {
+            return AjaxResult.error("无权操作");
+        }
+        if (!redisManager.isCsAvailable(targetCsUserId)) {
+            return AjaxResult.error("目标客服当前不可接待");
+        }
+
+        String transferId = UUID.randomUUID().toString().replace("-", "");
+        redisManager.setTransferRequest(transferId, sessionId, user.getUserId(), targetCsUserId, reason);
+
+        // 推送转接请求给目标客服B
+        ChatVisitor visitor = chatVisitorService.getById(session.getVisitorId());
+        String visitorNickname = visitor != null ? visitor.getNickname() : "访客";
+        com.ruoyi.chat.protocol.ChatMessage wsMsg = new com.ruoyi.chat.protocol.ChatMessage(com.ruoyi.chat.protocol.MessageType.CS_TRANSFER_REQUEST);
+        wsMsg.setFromUserId(user.getUserId());
+        wsMsg.setFromUserNickname(user.getNickName());
+        wsMsg.setSessionId(String.valueOf(sessionId));
+        wsMsg.setContent(reason != null ? reason : "");
+        wsMsg.setMessageId(transferId);
+        Map<String, Object> extra = new HashMap<>();
+        extra.put("transferId", transferId);
+        extra.put("visitorNickname", visitorNickname);
+        wsMsg.setExtra(extra);
+        chatChannelHandler.sendMessageToUser(targetCsUserId, wsMsg);
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("transferId", transferId);
+        return AjaxResult.success(data);
+    }
+
+    /**
+     * 接受转接请求
+     */
+    @PostMapping("/transfer/accept")
+    public AjaxResult acceptTransfer(@RequestBody Map<String, String> params) {
+        SysUser user = SecurityUtils.getLoginUser().getUser();
+        if (!Integer.valueOf(1).equals(user.getIsCustomerService())) {
+            return AjaxResult.error("无权访问");
+        }
+        String transferId = params.get("transferId");
+        Map<String, Object> request = redisManager.getTransferRequest(transferId);
+        if (request == null) {
+            return AjaxResult.error("转接请求已过期或不存在");
+        }
+        Long toCsUserId = Long.valueOf(request.get("toCsUserId").toString());
+        if (!toCsUserId.equals(user.getUserId())) {
+            return AjaxResult.error("无权操作");
+        }
+        Long sessionId = Long.valueOf(request.get("sessionId").toString());
+        Long fromCsUserId = Long.valueOf(request.get("fromCsUserId").toString());
+        String reason = (String) request.get("reason");
+
+        CsSession oldSession = csSessionService.getById(sessionId);
+        if (oldSession == null || !Integer.valueOf(CsSession.Status.ACTIVE).equals(oldSession.getStatus())) {
+            redisManager.deleteTransferRequest(transferId);
+            return AjaxResult.error("原会话已结束");
+        }
+
+        // 二次确认目标客服容量
+        int active = redisManager.getActiveCount(user.getUserId());
+        int max = redisManager.getMaxSessions(user.getUserId());
+        if (active >= max) {
+            return AjaxResult.error("您当前接待已满，无法接受转接");
+        }
+
+        Long visitorId = oldSession.getVisitorId();
+        ChatVisitor visitor = chatVisitorService.getById(visitorId);
+
+        // 1. 结束旧会话
+        csSessionService.closeSession(sessionId);
+        redisManager.decrementActiveCount(fromCsUserId);
+        csMessageService.sendSystemMessage(sessionId, "会话已转接给客服 " + user.getNickName());
+
+        // 2. 创建新会话
+        CsSession newSession = csSessionService.createSession(visitorId, user.getUserId());
+        redisManager.incrementActiveCount(user.getUserId());
+        if (visitor != null) {
+            redisManager.setVisitorSession(visitor.getVisitorToken(), newSession.getId(), user.getUserId());
+            chatVisitorService.updateLastCsUserId(visitorId, user.getUserId());
+        }
+
+        // 3. 系统消息通知新会话
+        String systemContent = "客服 " + user.getNickName() + " 已接入（由 " + sysUserService.selectUserById(fromCsUserId).getNickName() + " 转接）";
+        if (reason != null && !reason.isEmpty()) {
+            systemContent += "，转接原因：" + reason;
+        }
+        csMessageService.sendMessage(newSession.getId(), CsMessage.FromType.SYSTEM, null, systemContent);
+
+        // 4. 推送通知给原客服A
+        com.ruoyi.chat.protocol.ChatMessage acceptMsg = new com.ruoyi.chat.protocol.ChatMessage(com.ruoyi.chat.protocol.MessageType.CS_TRANSFER_ACCEPT);
+        acceptMsg.setContent("转接成功");
+        acceptMsg.setSessionId(String.valueOf(sessionId));
+        Map<String, Object> acceptExtra = new HashMap<>();
+        acceptExtra.put("newSessionId", newSession.getId());
+        acceptExtra.put("toCsNickname", user.getNickName());
+        acceptMsg.setExtra(acceptExtra);
+        chatChannelHandler.sendMessageToUser(fromCsUserId, acceptMsg);
+
+        // 5. 推送通知给访客
+        if (visitor != null) {
+            com.ruoyi.chat.protocol.ChatMessage visitorMsg = new com.ruoyi.chat.protocol.ChatMessage(com.ruoyi.chat.protocol.MessageType.CS_TRANSFER_RESULT);
+            visitorMsg.setContent(systemContent);
+            visitorMsg.setSessionId(String.valueOf(newSession.getId()));
+            visitorMsg.setFromUserNickname(user.getNickName());
+            chatChannelHandler.sendMessageToVisitor(visitor.getVisitorToken(), visitorMsg);
+        }
+
+        // 6. 推送新会话通知给客服B（让自己刷新列表）
+        com.ruoyi.chat.protocol.ChatMessage notice = new com.ruoyi.chat.protocol.ChatMessage(com.ruoyi.chat.protocol.MessageType.SYSTEM_NOTICE);
+        notice.setContent("新访客接入（转接）");
+        notice.setSessionId(String.valueOf(newSession.getId()));
+        chatChannelHandler.sendMessageToUser(user.getUserId(), notice);
+
+        redisManager.setTransferStatus(transferId, "ACCEPTED");
+        redisManager.deleteTransferRequest(transferId);
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("newSessionId", newSession.getId());
+        return AjaxResult.success(data);
+    }
+
+    /**
+     * 拒绝转接请求
+     */
+    @PostMapping("/transfer/reject")
+    public AjaxResult rejectTransfer(@RequestBody Map<String, String> params) {
+        SysUser user = SecurityUtils.getLoginUser().getUser();
+        if (!Integer.valueOf(1).equals(user.getIsCustomerService())) {
+            return AjaxResult.error("无权访问");
+        }
+        String transferId = params.get("transferId");
+        Map<String, Object> request = redisManager.getTransferRequest(transferId);
+        if (request == null) {
+            return AjaxResult.error("转接请求已过期或不存在");
+        }
+        Long toCsUserId = Long.valueOf(request.get("toCsUserId").toString());
+        if (!toCsUserId.equals(user.getUserId())) {
+            return AjaxResult.error("无权操作");
+        }
+        Long fromCsUserId = Long.valueOf(request.get("fromCsUserId").toString());
+
+        com.ruoyi.chat.protocol.ChatMessage rejectMsg = new com.ruoyi.chat.protocol.ChatMessage(com.ruoyi.chat.protocol.MessageType.CS_TRANSFER_REJECT);
+        rejectMsg.setContent("对方拒绝了转接请求");
+        rejectMsg.setFromUserNickname(user.getNickName());
+        chatChannelHandler.sendMessageToUser(fromCsUserId, rejectMsg);
+
+        redisManager.setTransferStatus(transferId, "REJECTED");
+        redisManager.deleteTransferRequest(transferId);
         return AjaxResult.success();
     }
 

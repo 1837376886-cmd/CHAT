@@ -263,6 +263,38 @@ public class CustomerServiceRedisManager {
         return active < max;
     }
 
+    // ==================== 转接请求 ====================
+
+    private static final String CS_TRANSFER_PREFIX = "cs:transfer:";
+
+    public void setTransferRequest(String transferId, Long sessionId, Long fromCsUserId, Long toCsUserId, String reason) {
+        String key = CS_TRANSFER_PREFIX + transferId;
+        Map<String, Object> map = new HashMap<>();
+        map.put("sessionId", sessionId);
+        map.put("fromCsUserId", fromCsUserId);
+        map.put("toCsUserId", toCsUserId);
+        map.put("reason", reason);
+        map.put("status", "PENDING");
+        map.put("createTime", System.currentTimeMillis());
+        redisCache.setCacheMap(key, map);
+        redisCache.expire(key, 300, TimeUnit.SECONDS);
+    }
+
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> getTransferRequest(String transferId) {
+        String key = CS_TRANSFER_PREFIX + transferId;
+        return redisCache.getCacheMap(key);
+    }
+
+    public void setTransferStatus(String transferId, String status) {
+        String key = CS_TRANSFER_PREFIX + transferId;
+        redisCache.setCacheMapValue(key, "status", status);
+    }
+
+    public void deleteTransferRequest(String transferId) {
+        redisCache.deleteObject(CS_TRANSFER_PREFIX + transferId);
+    }
+
     // ==================== 分布式锁 ====================
 
     /**
