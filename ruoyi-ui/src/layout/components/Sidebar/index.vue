@@ -10,6 +10,7 @@
                 :unique-opened="true"
                 :active-text-color="settings.theme"
                 :collapse-transition="false"
+                :indent="16"
                 mode="vertical"
             >
                 <sidebar-item

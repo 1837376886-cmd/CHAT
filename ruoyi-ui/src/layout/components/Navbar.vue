@@ -108,8 +108,21 @@ export default {
       this.$emit('setLayout')
     },
     goToCsWorkbench() {
-      this.$router.push('/cs/workbench')
+      const path = this.findCsWorkbenchPath(this.$store.getters.sidebarRouters)
+      this.$router.push(path || '/system/chat/workbench')
       this.$store.dispatch('csNotice/clearUnread')
+    },
+    findCsWorkbenchPath(routes) {
+      for (const route of routes || []) {
+        if (route.path && route.path.includes('workbench')) {
+          return route.path
+        }
+        if (route.children) {
+          const childPath = this.findCsWorkbenchPath(route.children)
+          if (childPath) return childPath
+        }
+      }
+      return null
     },
     onBellAnimationEnd() {
       this.$store.dispatch('csNotice/resetNewFlag')
@@ -139,9 +152,18 @@ export default {
 
   .cs-notice-bell {
     position: relative;
+    padding-right: 4px;
     .el-icon-bell {
       font-size: 20px;
       color: #5a5e66;
+    }
+    .cs-badge ::v-deep .el-badge__content {
+      font-size: 10px;
+      height: 14px;
+      line-height: 14px;
+      padding: 0 4px;
+      top: 6px;
+      right: 2px;
     }
     .cs-bell-shake {
       animation: bellShake 0.8s cubic-bezier(.36,.07,.19,.97) both;

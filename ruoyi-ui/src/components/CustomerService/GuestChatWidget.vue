@@ -183,6 +183,7 @@ export default {
     async startConsult() {
       this.confirmed = true
       this.messages = []
+      this.sessionEnded = false
       await this.doConnect()
     },
     generateToken() {
@@ -214,6 +215,7 @@ export default {
           this.sessionId = data.sessionId
           this.csUserId = data.csUserId
           this.csNickname = data.csNickname
+          this.sessionEnded = false
           this.initWebSocket()
           // 只有当前没有消息时才加载历史，避免覆盖已有消息（如转接后）
           if (this.messages.length === 0) {

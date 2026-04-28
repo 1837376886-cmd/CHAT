@@ -4,6 +4,7 @@ import com.ruoyi.chat.domain.entity.ChatVisitor;
 import com.ruoyi.chat.domain.entity.CsConfig;
 import com.ruoyi.chat.domain.entity.CsMessage;
 import com.ruoyi.chat.domain.entity.CsSession;
+import com.ruoyi.chat.domain.entity.CsVisitorTag;
 import com.ruoyi.chat.service.*;
 import com.ruoyi.common.annotation.RateLimiter;
 import com.ruoyi.common.core.domain.AjaxResult;
@@ -50,6 +51,9 @@ public class CustomerServiceController {
 
     @Autowired
     private ICsConfigService csConfigService;
+
+    @Autowired
+    private ICsVisitorTagService csVisitorTagService;
 
     @Autowired
     private com.ruoyi.chat.netty.ChatChannelHandler chatChannelHandler;
@@ -868,6 +872,54 @@ public class CustomerServiceController {
 
         redisManager.setTransferStatus(transferId, "REJECTED");
         redisManager.deleteTransferRequest(transferId);
+        return AjaxResult.success();
+    }
+
+    // ==================== 访客标签接口 ====================
+
+    /**
+     * 查询访客标签列表
+     */
+    @GetMapping("/visitor/{visitorId}/tags")
+    public AjaxResult getVisitorTags(@PathVariable Long visitorId) {
+        List<CsVisitorTag> list = csVisitorTagService.selectByVisitorId(visitorId);
+        return AjaxResult.success(list);
+    }
+
+    /**
+     * 添加访客标签
+     */
+    @PostMapping("/visitor/tag/add")
+    public AjaxResult addVisitorTag(@RequestBody Map<String, Object> params) {
+        Long visitorId = Long.valueOf(params.get("visitorId").toString());
+        String tagName = (String) params.get("tagName");
+        if (visitorId == null || tagName == null || tagName.trim().isEmpty()) {
+            return AjaxResult.error("参数错误");
+        }
+        tagName = tagName.trim();
+        if (tagName.length() > 50) {
+            return AjaxResult.error("标签名称最多50个字符");
+        }
+        Long csUserId = SecurityUtils.getLoginUser().getUser().getUserId();
+        com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<CsVisitorTag> wrapper = new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<>();
+        wrapper.eq("visitor_id", visitorId).eq("tag_name", tagName);
+        if (csVisitorTagService.count(wrapper) > 0) {
+            return AjaxResult.error("该标签已存在");
+        }
+        CsVisitorTag tag = new CsVisitorTag();
+        tag.setVisitorId(visitorId);
+        tag.setTagName(tagName);
+        tag.setCreateBy(csUserId);
+        csVisitorTagService.save(tag);
+        return AjaxResult.success(tag);
+    }
+
+    /**
+     * 删除访客标签
+     */
+    @DeleteMapping("/visitor/tag/{tagId}")
+    public AjaxResult deleteVisitorTag(@PathVariable Long tagId) {
+        csVisitorTagService.removeById(tagId);
         return AjaxResult.success();
     }
 

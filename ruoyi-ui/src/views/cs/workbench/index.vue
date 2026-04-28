@@ -186,6 +186,34 @@
           <div class="cs-info-label">接入时间</div>
           <div class="cs-info-value">{{ formatFullTime(currentSession.startTime) }}</div>
         </div>
+        <div class="cs-info-item cs-tag-section">
+          <div class="cs-info-label">访客标签</div>
+          <div class="cs-tag-list">
+            <el-tag
+              v-for="tag in visitorTags"
+              :key="tag.id"
+              size="small"
+              closable
+              class="cs-tag-item"
+              @close="handleTagClose(tag)"
+            >
+              {{ tag.tagName }}
+            </el-tag>
+            <el-input
+              v-if="tagInputVisible"
+              ref="tagInput"
+              v-model="tagInputValue"
+              size="mini"
+              class="cs-tag-input"
+              maxlength="50"
+              @keyup.enter.native="handleTagConfirm"
+              @blur="handleTagConfirm"
+            />
+            <el-button v-else size="mini" class="cs-tag-add" @click="showTagInput">
+              <i class="el-icon-plus"></i> 新增标签
+            </el-button>
+          </div>
+        </div>
       </div>
       <div v-else class="cs-info-empty">未选择会话</div>
     </div>
@@ -193,7 +221,7 @@
 </template>
 
 <script>
-import { getWorkbenchSessions, closeCsSession, csOnline, csOffline, getCsSessionMessages, readCsSession, getWaitingCount, getVisitorHistoryMessages, getMyCsStatus, getVisitorDetail, getOnlineStaff, requestTransfer, acceptTransfer, rejectTransfer } from '@/api/cs'
+import { getWorkbenchSessions, closeCsSession, csOnline, csOffline, getCsSessionMessages, readCsSession, getWaitingCount, getVisitorHistoryMessages, getMyCsStatus, getVisitorDetail, getOnlineStaff, requestTransfer, acceptTransfer, rejectTransfer, getVisitorTags, addVisitorTag, deleteVisitorTag } from '@/api/cs'
 import { WS_URL, MessageType } from '@/utils/chatConstants'
 import ChatWebSocket from '@/utils/chatWebSocket'
 import { getToken } from '@/utils/auth'
@@ -222,7 +250,10 @@ export default {
       transferReason: '',
       onlineStaffList: [],
       transferSessionId: null,
-      transferLoading: false
+      transferLoading: false,
+      visitorTags: [],
+      tagInputVisible: false,
+      tagInputValue: ''
     }
   },
   computed: {
@@ -311,6 +342,7 @@ export default {
       this.$set(this.unreadMap, session.id, 0)
       readCsSession(session.id)
       this.loadVisitorDetail(session.visitorId)
+      this.loadVisitorTags(session.visitorId)
     },
     loadMessages(sessionId, setCurrent = true) {
       const cached = this.messageMap[sessionId]
@@ -424,6 +456,7 @@ export default {
             this.currentSessionId = null
             this.currentMessages = []
             this.visitorDetail = null
+            this.visitorTags = []
           }
           this.loadSessions()
         })
@@ -439,6 +472,7 @@ export default {
             this.currentSessionId = null
             this.currentMessages = []
             this.visitorDetail = null
+            this.visitorTags = []
           }
           // 只关闭WS，保留排队轮询，让客服继续看到排队人数
           if (this.wsClient) {
@@ -737,10 +771,58 @@ export default {
         this.currentSessionId = null
         this.currentMessages = []
         this.visitorDetail = null
+        this.visitorTags = []
       }
     },
     handleTransferReject() {
       this.$message.warning('对方拒绝了转接请求')
+    },
+    loadVisitorTags(visitorId) {
+      this.visitorTags = []
+      getVisitorTags(visitorId).then(res => {
+        this.visitorTags = res.data || []
+      }).catch(() => {
+        this.visitorTags = []
+      })
+    },
+    showTagInput() {
+      this.tagInputVisible = true
+      this.$nextTick(() => {
+        this.$refs.tagInput && this.$refs.tagInput.focus()
+      })
+    },
+    handleTagConfirm() {
+      const value = this.tagInputValue.trim()
+      if (!value) {
+        this.tagInputVisible = false
+        this.tagInputValue = ''
+        return
+      }
+      const session = this.currentSession
+      if (!session || !session.visitorId) {
+        this.$message.warning('请先选择访客')
+        return
+      }
+      addVisitorTag({ visitorId: session.visitorId, tagName: value }).then(res => {
+        this.visitorTags.push(res.data)
+        this.tagInputVisible = false
+        this.tagInputValue = ''
+      }).catch(() => {
+        this.$message.error('添加标签失败')
+      })
+    },
+    handleTagClose(tag) {
+      this.$confirm(`确定删除标签 "${tag.tagName}" 吗？`, '提示', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }).then(() => {
+        deleteVisitorTag(tag.id).then(() => {
+          this.visitorTags = this.visitorTags.filter(t => t.id !== tag.id)
+        }).catch(() => {
+          this.$message.error('删除标签失败')
+        })
+      }).catch(() => {})
     },
     formatFullTime(timeStr) {
       if (!timeStr) return '-'
@@ -1138,6 +1220,8 @@ export default {
 }
 .cs-info-body {
   padding: 16px;
+  flex: 1;
+  overflow-y: auto;
 }
 .cs-info-item {
   margin-bottom: 16px;
@@ -1166,5 +1250,29 @@ export default {
 .cs-info-muted {
   color: #c0c4cc;
   font-size: 13px;
+}
+.cs-tag-section {
+  margin-top: 8px;
+  padding-top: 12px;
+  border-top: 1px dashed #e4e7ed;
+}
+.cs-tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-height: 140px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+.cs-tag-item {
+  margin-right: 0;
+}
+.cs-tag-input {
+  width: 90px;
+}
+.cs-tag-add {
+  padding: 0 8px;
+  height: 24px;
+  line-height: 22px;
 }
 </style>

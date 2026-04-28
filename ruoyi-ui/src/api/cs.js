@@ -185,3 +185,25 @@ export function rejectTransfer(data) {
     data
   })
 }
+
+export function getVisitorTags(visitorId) {
+  return request({
+    url: `/cs/visitor/${visitorId}/tags`,
+    method: 'get'
+  })
+}
+
+export function addVisitorTag(data) {
+  return request({
+    url: '/cs/visitor/tag/add',
+    method: 'post',
+    data
+  })
+}
+
+export function deleteVisitorTag(tagId) {
+  return request({
+    url: `/cs/visitor/tag/${tagId}`,
+    method: 'delete'
+  })
+}

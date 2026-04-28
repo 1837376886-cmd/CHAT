@@ -92,3 +92,14 @@ INSERT INTO `sys_menu` (`menu_id`, `menu_name`, `parent_id`, `order_num`, `path`
 -- 按钮权限（客服人员设置）
 INSERT INTO `sys_menu` (`menu_id`, `menu_name`, `parent_id`, `order_num`, `path`, `component`, `is_frame`, `is_cache`, `menu_type`, `visible`, `status`, `perms`, `icon`, `create_by`, `create_time`, `update_by`, `update_time`, `remark`) VALUES
 (2005, '设置客服身份', 2002, 1, '', NULL, 1, 0, 'F', '0', '0', 'cs:staff:set', '#', 'admin', NOW(), 'admin', NOW(), '');
+
+-- 7. 访客标签表
+CREATE TABLE IF NOT EXISTS `cs_visitor_tag` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `visitor_id` bigint NOT NULL COMMENT '访客ID（chat_visitor.id）',
+  `tag_name` varchar(50) NOT NULL COMMENT '标签名称',
+  `create_by` bigint DEFAULT NULL COMMENT '创建人（客服userId）',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_visitor_id` (`visitor_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='访客标签表';
