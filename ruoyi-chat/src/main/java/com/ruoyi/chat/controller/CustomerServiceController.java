@@ -219,6 +219,19 @@ public class CustomerServiceController {
         }
 
         List<CsSession> sessions = csSessionService.selectActiveSessionsByCsUserId(user.getUserId());
+        for (CsSession session : sessions) {
+            ChatVisitor visitor = chatVisitorService.getById(session.getVisitorId());
+            if (visitor != null) {
+                if (visitor.getBoundUserId() != null) {
+                    SysUser boundUser = sysUserService.selectUserById(visitor.getBoundUserId());
+                    session.setVisitorNickname(boundUser != null ? boundUser.getNickName() : visitor.getNickname());
+                } else {
+                    session.setVisitorNickname(visitor.getNickname());
+                }
+            } else {
+                session.setVisitorNickname("访客_" + session.getVisitorId());
+            }
+        }
         return AjaxResult.success(sessions);
     }
 
@@ -356,6 +369,40 @@ public class CustomerServiceController {
     }
 
     /**
+     * 获取访客详情（当前接待中的访客）
+     */
+    @GetMapping("/visitor/{visitorId}")
+    public AjaxResult getVisitorDetail(@PathVariable Long visitorId) {
+        SysUser user = SecurityUtils.getLoginUser().getUser();
+        if (!Integer.valueOf(1).equals(user.getIsCustomerService())) {
+            return AjaxResult.error("无权访问");
+        }
+        // 校验该访客是否有进行中的会话属于当前客服
+        CsSession activeSession = csSessionService.selectActiveSessionByVisitorId(visitorId);
+        if (activeSession == null || !activeSession.getCsUserId().equals(user.getUserId())) {
+            return AjaxResult.error("无权查看");
+        }
+        ChatVisitor visitor = chatVisitorService.getById(visitorId);
+        if (visitor == null) {
+            return AjaxResult.error("访客不存在");
+        }
+        Map<String, Object> data = new HashMap<>();
+        data.put("id", visitor.getId());
+        data.put("nickname", visitor.getNickname());
+        data.put("ip", visitor.getIp());
+        data.put("userAgent", visitor.getUserAgent());
+        data.put("sourcePage", visitor.getSourcePage());
+        data.put("deviceFingerprint", visitor.getDeviceFingerprint());
+        data.put("createTime", visitor.getCreateTime());
+        data.put("boundUserId", visitor.getBoundUserId());
+        if (visitor.getBoundUserId() != null) {
+            SysUser boundUser = sysUserService.selectUserById(visitor.getBoundUserId());
+            data.put("boundUserNickName", boundUser != null ? boundUser.getNickName() : null);
+        }
+        return AjaxResult.success(data);
+    }
+
+    /**
      * 客服查看访客的所有历史消息
      */
     @GetMapping("/visitor/{visitorId}/messages")
@@ -370,6 +417,32 @@ public class CustomerServiceController {
             return AjaxResult.error("无权查看");
         }
         List<CsMessage> messages = csMessageService.selectMessagesByVisitorId(visitorId);
+
+        // 填充发送者名称
+        ChatVisitor visitor = chatVisitorService.getById(visitorId);
+        String visitorName = null;
+        if (visitor != null) {
+            if (visitor.getBoundUserId() != null) {
+                SysUser boundUser = sysUserService.selectUserById(visitor.getBoundUserId());
+                visitorName = boundUser != null ? boundUser.getNickName() : visitor.getNickname();
+            } else {
+                visitorName = visitor.getNickname();
+            }
+        }
+        if (visitorName == null) {
+            visitorName = "访客";
+        }
+        for (CsMessage msg : messages) {
+            if (msg.getFromType() == CsMessage.FromType.VISITOR) {
+                msg.setSenderName(visitorName);
+            } else if (msg.getFromType() == CsMessage.FromType.CS) {
+                SysUser csUser = sysUserService.selectUserById(msg.getFromUserId());
+                msg.setSenderName(csUser != null ? csUser.getNickName() : "客服");
+            } else {
+                msg.setSenderName("系统");
+            }
+        }
+
         return AjaxResult.success(messages);
     }
 
@@ -450,7 +523,7 @@ public class CustomerServiceController {
         com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<CsSession> wrapper =
                 new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<CsSession>()
                         .eq("cs_user_id", user.getUserId())
-                        .orderByDesc("create_time");
+                        .orderByDesc("id");
         csSessionService.page(page, wrapper);
 
         for (CsSession session : page.getRecords()) {

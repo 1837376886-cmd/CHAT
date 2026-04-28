@@ -23,7 +23,7 @@
           <div class="cs-session-avatar">访</div>
           <div class="cs-session-info">
             <div class="cs-session-row">
-              <span class="cs-session-name">访客 {{ session.visitorId }}</span>
+              <span class="cs-session-name">{{ session.visitorNickname || '访客 ' + session.visitorId }}</span>
               <span class="cs-session-time">{{ formatTime(session.startTime) }}</span>
             </div>
             <div class="cs-session-preview">{{ lastMessage(session.id) }}</div>
@@ -42,7 +42,7 @@
       <div v-if="currentSession" class="cs-chat-area">
         <div class="cs-chat-header">
           <div class="cs-chat-header-info">
-            <span class="cs-chat-header-name">访客 {{ currentSession.visitorId }}</span>
+            <span class="cs-chat-header-name">{{ currentSession.visitorNickname || '访客 ' + currentSession.visitorId }}</span>
             <span class="cs-chat-header-status">
               <span class="cs-dot active"></span> 对话中
             </span>
@@ -65,7 +65,7 @@
               <div v-if="!msg.isSelf" class="cs-msg-avatar cs-avatar-guest">访</div>
               <div class="cs-msg-bubble">
                 <div class="cs-msg-sender">{{ msg.sender }}</div>
-                <div class="cs-msg-content">{{ msg.content }}</div>
+                <div class="cs-msg-content" :class="{ 'emoji-only': isPureEmoji(msg.content) }">{{ msg.content }}</div>
                 <div class="cs-msg-time">{{ msg.time }}</div>
               </div>
               <div v-if="msg.isSelf" class="cs-msg-avatar cs-avatar-cs">我</div>
@@ -73,13 +73,30 @@
           </div>
         </div>
         <div class="cs-chat-input">
-          <el-input
-            v-model="inputMessage"
-            type="textarea"
-            :rows="3"
-            placeholder="请输入回复，按 Enter 发送..."
-            @keyup.enter.native="sendMessage"
-          />
+          <div class="cs-input-wrap">
+            <div class="cs-toolbar">
+              <i class="el-icon-orange cs-toolbar-btn" title="表情" @click="toggleEmoji"></i>
+            </div>
+            <div v-if="emojiVisible" class="cs-emoji-picker">
+              <div class="cs-emoji-grid">
+                <span
+                  v-for="(emoji, idx) in emojiList"
+                  :key="idx"
+                  class="cs-emoji-item"
+                  @click="selectEmoji(emoji)"
+                >
+                  {{ emoji }}
+                </span>
+              </div>
+            </div>
+            <el-input
+              v-model="inputMessage"
+              type="textarea"
+              :rows="3"
+              placeholder="请输入回复，按 Enter 发送..."
+              @keyup.enter.native="sendMessage"
+            />
+          </div>
           <el-button type="primary" size="small" @click="sendMessage">发送</el-button>
         </div>
       </div>
@@ -100,6 +117,37 @@
           <div class="cs-info-value">{{ currentSession.visitorId }}</div>
         </div>
         <div class="cs-info-item">
+          <div class="cs-info-label">访客昵称</div>
+          <div class="cs-info-value">{{ visitorDetail ? visitorDetail.nickname : '-' }}</div>
+        </div>
+        <div class="cs-info-item">
+          <div class="cs-info-label">绑定用户</div>
+          <div class="cs-info-value">
+            <el-tag v-if="visitorDetail && visitorDetail.boundUserId" size="small" type="success">{{ visitorDetail.boundUserNickName || visitorDetail.boundUserId }}</el-tag>
+            <span v-else class="cs-info-muted">未绑定</span>
+          </div>
+        </div>
+        <div class="cs-info-item">
+          <div class="cs-info-label">IP地址</div>
+          <div class="cs-info-value">{{ visitorDetail ? visitorDetail.ip : '-' }}</div>
+        </div>
+        <div class="cs-info-item">
+          <div class="cs-info-label">设备指纹</div>
+          <div class="cs-info-value cs-info-ellipsis" :title="visitorDetail ? visitorDetail.deviceFingerprint : ''">{{ visitorDetail ? visitorDetail.deviceFingerprint : '-' }}</div>
+        </div>
+        <div class="cs-info-item">
+          <div class="cs-info-label">浏览器 / 设备</div>
+          <div class="cs-info-value cs-info-ellipsis" :title="visitorDetail ? visitorDetail.userAgent : ''">{{ visitorDetail ? visitorDetail.userAgent : '-' }}</div>
+        </div>
+        <div class="cs-info-item">
+          <div class="cs-info-label">来源页面</div>
+          <div class="cs-info-value cs-info-ellipsis" :title="visitorDetail ? visitorDetail.sourcePage : ''">{{ visitorDetail ? visitorDetail.sourcePage : '-' }}</div>
+        </div>
+        <div class="cs-info-item">
+          <div class="cs-info-label">首次访问</div>
+          <div class="cs-info-value">{{ visitorDetail ? formatFullTime(visitorDetail.createTime) : '-' }}</div>
+        </div>
+        <div class="cs-info-item">
           <div class="cs-info-label">会话状态</div>
           <div class="cs-info-value">
             <el-tag size="small" type="success">进行中</el-tag>
@@ -116,10 +164,11 @@
 </template>
 
 <script>
-import { getWorkbenchSessions, closeCsSession, csOnline, csOffline, getCsSessionMessages, readCsSession, getWaitingCount, getVisitorHistoryMessages, getMyCsStatus } from '@/api/cs'
+import { getWorkbenchSessions, closeCsSession, csOnline, csOffline, getCsSessionMessages, readCsSession, getWaitingCount, getVisitorHistoryMessages, getMyCsStatus, getVisitorDetail } from '@/api/cs'
 import { WS_URL, MessageType } from '@/utils/chatConstants'
 import ChatWebSocket from '@/utils/chatWebSocket'
 import { getToken } from '@/utils/auth'
+import { emojiList, isPureEmoji } from '@/utils/emoji'
 
 export default {
   name: 'CsWorkbench',
@@ -135,7 +184,10 @@ export default {
       messageMap: {},
       unreadMap: {},
       waitingCount: 0,
-      waitingPollTimer: null
+      waitingPollTimer: null,
+      emojiVisible: false,
+      emojiList: emojiList,
+      visitorDetail: null
     }
   },
   computed: {
@@ -184,6 +236,7 @@ export default {
       this.loadMessagesWithHistory(session.id)
       this.$set(this.unreadMap, session.id, 0)
       readCsSession(session.id)
+      this.loadVisitorDetail(session.visitorId)
     },
     loadMessages(sessionId, setCurrent = true) {
       const cached = this.messageMap[sessionId]
@@ -194,7 +247,7 @@ export default {
       getCsSessionMessages(sessionId).then(res => {
         const list = res.data || []
         const mapped = list.map(item => ({
-          sender: item.fromType === 2 ? '我' : (item.fromType === 1 ? '访客' : '系统'),
+          sender: item.senderName || (item.fromType === 2 ? '我' : (item.fromType === 1 ? '访客' : '系统')),
           content: item.content,
           time: this.formatTime(item.createTime),
           isSelf: item.fromType === 2,
@@ -216,7 +269,7 @@ export default {
       getCsSessionMessages(sessionId).then(res => {
         const list = res.data || []
         const currentMapped = list.map(item => ({
-          sender: item.fromType === 2 ? '我' : (item.fromType === 1 ? '访客' : '系统'),
+          sender: item.senderName || (item.fromType === 2 ? '我' : (item.fromType === 1 ? '访客' : '系统')),
           content: item.content,
           time: this.formatTime(item.createTime),
           isSelf: item.fromType === 2,
@@ -233,7 +286,7 @@ export default {
           const histMapped = histList
             .filter(item => item.sessionId !== sessionId)
             .map(item => ({
-              sender: item.fromType === 2 ? '客服' : (item.fromType === 1 ? '访客' : '系统'),
+              sender: item.senderName || (item.fromType === 2 ? '客服' : (item.fromType === 1 ? '访客' : '系统')),
               content: item.content,
               time: this.formatTime(item.createTime),
               isSelf: item.fromType === 2,
@@ -292,6 +345,7 @@ export default {
           if (this.currentSessionId === sessionId) {
             this.currentSessionId = null
             this.currentMessages = []
+            this.visitorDetail = null
           }
           this.loadSessions()
         })
@@ -306,6 +360,7 @@ export default {
           if (this.currentSessionId) {
             this.currentSessionId = null
             this.currentMessages = []
+            this.visitorDetail = null
           }
         })
       } else {
@@ -439,6 +494,24 @@ export default {
       }).catch(() => {
         this.waitingCount = 0
       })
+    },
+    loadVisitorDetail(visitorId) {
+      this.visitorDetail = null
+      getVisitorDetail(visitorId).then(res => {
+        this.visitorDetail = res.data || null
+      }).catch(() => {
+        this.visitorDetail = null
+      })
+    },
+    toggleEmoji() {
+      this.emojiVisible = !this.emojiVisible
+    },
+    selectEmoji(emoji) {
+      this.inputMessage += emoji
+      this.emojiVisible = false
+    },
+    isPureEmoji(content) {
+      return isPureEmoji(content)
     },
     formatFullTime(timeStr) {
       if (!timeStr) return '-'
@@ -741,6 +814,66 @@ export default {
 .cs-chat-input .el-textarea {
   flex: 1;
 }
+.cs-input-wrap {
+  flex: 1;
+  position: relative;
+}
+.cs-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+.cs-toolbar-btn {
+  font-size: 16px;
+  color: #909399;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+.cs-toolbar-btn:hover {
+  color: #409eff;
+  background: #f5f7fa;
+}
+.cs-emoji-picker {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 0;
+  width: 260px;
+  background: #fff;
+  border: 1px solid #ebeef5;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  padding: 8px;
+  z-index: 99999;
+}
+.cs-emoji-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 34px);
+  gap: 2px;
+  justify-content: center;
+  max-height: 180px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.cs-emoji-item {
+  font-size: 20px;
+  cursor: pointer;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  user-select: none;
+}
+.cs-emoji-item:hover {
+  background-color: #f0f0f0;
+}
+.cs-msg-content.emoji-only {
+  font-size: 28px;
+  line-height: 1.2;
+}
 .cs-no-select {
   flex: 1;
   display: flex;
@@ -793,6 +926,15 @@ export default {
 .cs-info-empty {
   padding: 40px 16px;
   text-align: center;
+  color: #c0c4cc;
+  font-size: 13px;
+}
+.cs-info-ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cs-info-muted {
   color: #c0c4cc;
   font-size: 13px;
 }

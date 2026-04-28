@@ -43,7 +43,7 @@
             <template v-else>
               <div class="cs-msg-bubble">
                 <div class="cs-msg-sender">{{ msg.sender }}</div>
-                <div class="cs-msg-content">{{ msg.content }}</div>
+                <div class="cs-msg-content" :class="{ 'emoji-only': isPureEmoji(msg.content) }">{{ msg.content }}</div>
                 <div class="cs-msg-time">{{ msg.time }}</div>
               </div>
             </template>
@@ -52,14 +52,31 @@
       </div>
 
       <div v-if="confirmed" class="cs-chat-footer">
-        <el-input
-          v-model="inputMessage"
-          type="textarea"
-          :rows="2"
-          placeholder="请输入您的问题..."
-          :disabled="inputDisabled"
-          @keyup.enter.native="handleSend"
-        />
+        <div class="cs-input-wrap">
+          <div class="cs-toolbar">
+            <i class="el-icon-s-grid cs-toolbar-btn" title="表情" @click="toggleEmoji"></i>
+          </div>
+          <div v-if="emojiVisible" class="cs-emoji-picker">
+            <div class="cs-emoji-grid">
+              <span
+                v-for="(emoji, idx) in emojiList"
+                :key="idx"
+                class="cs-emoji-item"
+                @click="selectEmoji(emoji)"
+              >
+                {{ emoji }}
+              </span>
+            </div>
+          </div>
+          <el-input
+            v-model="inputMessage"
+            type="textarea"
+            :rows="2"
+            placeholder="请输入您的问题..."
+            :disabled="inputDisabled"
+            @keyup.enter.native="handleSend"
+          />
+        </div>
         <el-button
           type="primary"
           size="small"
@@ -77,6 +94,7 @@
 import { csConnect, getCsSessionHistory, cancelWaiting } from '@/api/cs'
 import { WS_URL, MessageType } from '@/utils/chatConstants'
 import ChatWebSocket from '@/utils/chatWebSocket'
+import { emojiList, isPureEmoji } from '@/utils/emoji'
 
 export default {
   name: 'GuestChatWidget',
@@ -97,7 +115,9 @@ export default {
       messages: [],
       wsClient: null,
       wsConnected: false,
-      reconnectTimer: null
+      reconnectTimer: null,
+      emojiVisible: false,
+      emojiList: emojiList
     }
   },
   computed: {
@@ -261,10 +281,9 @@ export default {
           this.sessionId = null
           this.csNickname = null
           this.csUserId = null
-          this.confirmed = false
           this.waiting = false
           this.waitingForLastCs = false
-          this.messages = []
+          // 保留聊天界面和消息记录，仅禁用输入，让用户看到结束提示后可重新咨询
         }
       }
       if (msg.type === MessageType.ERROR) {
@@ -332,6 +351,16 @@ export default {
           container.scrollTop = container.scrollHeight
         }
       })
+    },
+    toggleEmoji() {
+      this.emojiVisible = !this.emojiVisible
+    },
+    selectEmoji(emoji) {
+      this.inputMessage += emoji
+      this.emojiVisible = false
+    },
+    isPureEmoji(content) {
+      return isPureEmoji(content)
     },
     formatTime(timeStr) {
       if (!timeStr) return ''
@@ -509,5 +538,65 @@ export default {
 }
 .cs-chat-footer .el-textarea {
   flex: 1;
+}
+.cs-input-wrap {
+  flex: 1;
+  position: relative;
+}
+.cs-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+.cs-toolbar-btn {
+  font-size: 16px;
+  color: #909399;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+.cs-toolbar-btn:hover {
+  color: #409eff;
+  background: #f5f7fa;
+}
+.cs-emoji-picker {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 0;
+  width: 260px;
+  background: #fff;
+  border: 1px solid #ebeef5;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  padding: 8px;
+  z-index: 99999;
+}
+.cs-emoji-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 34px);
+  gap: 2px;
+  justify-content: center;
+  max-height: 180px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.cs-emoji-item {
+  font-size: 20px;
+  cursor: pointer;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  user-select: none;
+}
+.cs-emoji-item:hover {
+  background-color: #f0f0f0;
+}
+.cs-msg-content.emoji-only {
+  font-size: 28px;
+  line-height: 1.2;
 }
 </style>

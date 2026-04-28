@@ -147,3 +147,10 @@ export function getVisitorHistoryMessages(visitorId) {
     method: 'get'
   })
 }
+
+export function getVisitorDetail(visitorId) {
+  return request({
+    url: `/cs/visitor/${visitorId}`,
+    method: 'get'
+  })
+}

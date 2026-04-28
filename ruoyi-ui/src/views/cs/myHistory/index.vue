@@ -45,7 +45,7 @@
           <template v-else>
             <div class="msg-bubble">
               <div class="msg-sender">{{ msg.senderName || (msg.fromType === 2 ? '客服' : '访客') }}</div>
-              <div class="msg-content">{{ msg.content }}</div>
+              <div class="msg-content" :class="{ 'emoji-only': isPureEmoji(msg.content) }">{{ msg.content }}</div>
               <div class="msg-time">{{ formatTime(msg.createTime) }}</div>
             </div>
           </template>
@@ -57,6 +57,7 @@
 
 <script>
 import { getCsMyHistory, getCsSessionMessages } from '@/api/cs'
+import { isPureEmoji } from '@/utils/emoji'
 
 export default {
   name: 'CsMyHistory',
@@ -93,6 +94,9 @@ export default {
         this.detailMessages = res.data || []
         this.detailVisible = true
       })
+    },
+    isPureEmoji(content) {
+      return isPureEmoji(content)
     },
     formatTime(timeStr) {
       if (!timeStr) return ''
@@ -170,5 +174,9 @@ export default {
 }
 .chat-msg.self .msg-time {
   color: rgba(255,255,255,0.7);
+}
+.msg-content.emoji-only {
+  font-size: 28px;
+  line-height: 1.2;
 }
 </style>
