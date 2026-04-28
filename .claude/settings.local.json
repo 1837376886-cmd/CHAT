@@ -18,7 +18,8 @@
       "Bash(npm run *)",
       "Bash(/c/maven/apache-maven-3.8.4/bin/mvn.cmd clean *)",
       "Bash(/c/maven/apache-maven-3.8.4/bin/mvn.cmd package *)",
-      "Bash(mvn package *)"
+      "Bash(mvn package *)",
+      "Bash(export PATH=\"/c/maven/apache-maven-3.8.4/bin:$PATH\")"
     ]
   }
 }

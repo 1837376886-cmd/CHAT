@@ -9,6 +9,8 @@ import javax.sql.DataSource;
 import org.apache.ibatis.io.VFS;
 import org.apache.ibatis.session.SqlSessionFactory;
 import com.baomidou.mybatisplus.annotation.DbType;
+import com.baomidou.mybatisplus.core.config.GlobalConfig;
+import com.baomidou.mybatisplus.core.handlers.MetaObjectHandler;
 import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.inner.PaginationInnerInterceptor;
 import com.baomidou.mybatisplus.extension.spring.MybatisSqlSessionFactoryBean;
@@ -33,6 +35,9 @@ public class MyBatisConfig
 {
     @Autowired
     private Environment env;
+
+    @Autowired(required = false)
+    private MetaObjectHandler metaObjectHandler;
 
     static final String DEFAULT_RESOURCE_PATTERN = "**/*.class";
 
@@ -130,7 +135,13 @@ public class MyBatisConfig
         MybatisPlusInterceptor interceptor = new MybatisPlusInterceptor();
         interceptor.addInnerInterceptor(new PaginationInnerInterceptor(DbType.MYSQL));
         sessionFactory.setPlugins(interceptor);
-        
+
+        if (metaObjectHandler != null) {
+            GlobalConfig globalConfig = new GlobalConfig();
+            globalConfig.setMetaObjectHandler(metaObjectHandler);
+            sessionFactory.setGlobalConfig(globalConfig);
+        }
+
         return sessionFactory.getObject();
     }
 }
