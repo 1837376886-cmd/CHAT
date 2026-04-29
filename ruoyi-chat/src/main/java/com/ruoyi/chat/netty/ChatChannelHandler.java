@@ -40,12 +40,6 @@ public class ChatChannelHandler extends SimpleChannelInboundHandler<TextWebSocke
     private ChatConnectionManager connectionManager;
 
     @Autowired
-    private IChatMessageService chatMessageService;
-
-    @Autowired
-    private IChatSessionService chatSessionService;
-
-    @Autowired
     private com.ruoyi.system.service.ISysUserService sysUserService;
 
     @Autowired
@@ -152,17 +146,8 @@ public class ChatChannelHandler extends SimpleChannelInboundHandler<TextWebSocke
             case HEARTBEAT:
                 handleHeartbeat(ctx, message);
                 break;
-            case PRIVATE_CHAT:
-                handlePrivateChat(ctx, message);
-                break;
-            case GROUP_CHAT:
-                handleGroupChat(ctx, message);
-                break;
             case CS_CHAT:
                 handleCsChat(ctx, message);
-                break;
-            case MESSAGE_READ:
-                handleMessageRead(ctx, message);
                 break;
             default:
                 logger.warn("未知消息类型：{}", type);
@@ -367,132 +352,6 @@ public class ChatChannelHandler extends SimpleChannelInboundHandler<TextWebSocke
         ChatMessage response = new ChatMessage(MessageType.HEARTBEAT_RESPONSE);
         response.setMessageId(UUID.randomUUID().toString());
         sendMessage(ctx, response);
-    }
-
-    private void handlePrivateChat(ChannelHandlerContext ctx, ChatMessage message) {
-        if (!isAuthenticated(ctx)) {
-            sendErrorMessage(ctx, "未认证");
-            return;
-        }
-
-        Long fromUserId = ctx.channel().attr(USER_ID_KEY).get();
-        Long toUserId = message.getToUserId();
-        String sessionId = message.getSessionId();
-        
-        logger.debug("处理私聊消息 - fromUserId: {}, toUserId: {}, sessionId: {}", fromUserId, toUserId, sessionId);
-        
-        if (StringUtils.isEmpty(sessionId)) {
-            sendErrorMessage(ctx, "会话ID不能为空");
-            return;
-        }
-
-        if (toUserId == null || toUserId == 0) {
-            List<com.ruoyi.chat.domain.entity.ChatSessionMember> members = chatSessionService.getSessionMembers(sessionId);
-            for (com.ruoyi.chat.domain.entity.ChatSessionMember member : members) {
-                if (!member.getUserId().equals(fromUserId)) {
-                    toUserId = member.getUserId();
-                    break;
-                }
-            }
-            if (toUserId == null) {
-                logger.warn("私聊会话 {} 中找不到除 {} 以外的其他成员", sessionId, fromUserId);
-                sendErrorMessage(ctx, "无法找到接收者");
-                return;
-            }
-            logger.debug("从数据库查询到接收者: {}", toUserId);
-        }
-
-        message.setFromUserId(fromUserId);
-        message.setToUserId(toUserId);
-
-        com.ruoyi.common.core.domain.entity.SysUser user = sysUserService.selectUserById(fromUserId);
-        String nickname = user != null ? user.getUserName() : null;
-
-        io.netty.channel.Channel toChannel = connectionManager.getUserChannel(toUserId);
-        if (toChannel != null && toChannel.isActive()) {
-            ChatMessage pushMessage = new ChatMessage();
-            pushMessage.setType(message.getType());
-            pushMessage.setMessageId(message.getMessageId() != null ? message.getMessageId() : UUID.randomUUID().toString());
-            pushMessage.setSessionId(sessionId);
-            pushMessage.setFromUserId(fromUserId);
-            pushMessage.setToUserId(toUserId);
-            pushMessage.setContent(message.getContent());
-            pushMessage.setContentType(message.getContentType());
-            pushMessage.setTimestamp(message.getTimestamp() != null ? message.getTimestamp() : new java.util.Date());
-            pushMessage.setExtra(message.getExtra());
-            pushMessage.setFromUserNickname(nickname);
-            
-            sendMessage(toChannel, pushMessage);
-            logger.debug("消息已推送给接收者: {}", toUserId);
-        } else {
-            logger.debug("接收者 {} 不在线，消息将通过HTTP保存", toUserId);
-        }
-        
-        ChatMessage senderMessage = new ChatMessage();
-        senderMessage.setType(message.getType());
-        senderMessage.setMessageId(message.getMessageId() != null ? message.getMessageId() : UUID.randomUUID().toString());
-        senderMessage.setSessionId(sessionId);
-        senderMessage.setFromUserId(fromUserId);
-        senderMessage.setToUserId(toUserId);
-        senderMessage.setContent(message.getContent());
-        senderMessage.setContentType(message.getContentType());
-        senderMessage.setTimestamp(message.getTimestamp() != null ? message.getTimestamp() : new java.util.Date());
-        senderMessage.setExtra(message.getExtra());
-        senderMessage.setFromUserNickname(nickname);
-        
-        sendMessage(ctx, senderMessage);
-        logger.debug("确认消息已发送给发送者: {}", fromUserId);
-
-        logger.info("私聊消息：{} -> {}", fromUserId, toUserId);
-    }
-
-    private void handleGroupChat(ChannelHandlerContext ctx, ChatMessage message) {
-        if (!isAuthenticated(ctx)) {
-            sendErrorMessage(ctx, "未认证");
-            return;
-        }
-
-        Long fromUserId = ctx.channel().attr(USER_ID_KEY).get();
-        String sessionId = message.getSessionId();
-        
-        if (StringUtils.isEmpty(sessionId)) {
-            sendErrorMessage(ctx, "会话ID不能为空");
-            return;
-        }
-
-        message.setMessageId(UUID.randomUUID().toString());
-        message.setFromUserId(fromUserId);
-        
-        com.ruoyi.common.core.domain.entity.SysUser user = sysUserService.selectUserById(fromUserId);
-        if (user != null) {
-            message.setFromUserNickname(user.getUserName());
-        }
-
-        chatMessageService.saveGroupMessage(message);
-
-        Set<Long> members = connectionManager.getSessionMembers(sessionId);
-        for (Long memberId : members) {
-            if (!memberId.equals(fromUserId)) {
-                io.netty.channel.Channel memberChannel = connectionManager.getUserChannel(memberId);
-                if (memberChannel != null && memberChannel.isActive()) {
-                    sendMessage(memberChannel, message);
-                }
-            }
-        }
-
-        logger.info("群聊消息：{} -> 会话 {}", fromUserId, sessionId);
-    }
-
-    private void handleMessageRead(ChannelHandlerContext ctx, ChatMessage message) {
-        if (!isAuthenticated(ctx)) {
-            sendErrorMessage(ctx, "未认证");
-            return;
-        }
-
-        Long userId = ctx.channel().attr(USER_ID_KEY).get();
-        chatMessageService.markMessageAsRead(message.getMessageId(), userId);
-        
-        logger.info("消息已读：用户 {} 消息 {}", userId, message.getMessageId());
     }
 
     private boolean isAuthenticated(ChannelHandlerContext ctx) {

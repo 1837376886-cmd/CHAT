@@ -73,16 +73,11 @@ CREATE TABLE IF NOT EXISTS `cs_config` (
 INSERT INTO `ruoyi-chat`.`sys_menu` (`menu_id`, `menu_name`, `parent_id`, `order_num`, `path`, `component`, `query`, `route_name`, `is_frame`, `is_cache`, `menu_type`, `visible`, `status`, `perms`, `icon`, `create_by`, `create_time`, `update_by`, `update_time`, `remark`) VALUES
 (2000, '聊天', 1, 10, 'chat', NULL, NULL, '', 1, 0, 'M', '0', '0', '', 'message', 'admin', '2026-04-25 15:45:22', 'admin', '2026-04-25 15:45:57', '');
 INSERT INTO `ruoyi-chat`.`sys_menu` (`menu_id`, `menu_name`, `parent_id`, `order_num`, `path`, `component`, `query`, `route_name`, `is_frame`, `is_cache`, `menu_type`, `visible`, `status`, `perms`, `icon`, `create_by`, `create_time`, `update_by`, `update_time`, `remark`) VALUES
-(2001, '聊天室', 2000, 1, 'index', 'chat/index', NULL, '', 1, 0, 'C', '0', '0', 'chat:view', 'qq', 'admin', '2026-04-25 15:46:47', 'admin', '2026-04-27 17:24:23', '');
-INSERT INTO `ruoyi-chat`.`sys_menu` (`menu_id`, `menu_name`, `parent_id`, `order_num`, `path`, `component`, `query`, `route_name`, `is_frame`, `is_cache`, `menu_type`, `visible`, `status`, `perms`, `icon`, `create_by`, `create_time`, `update_by`, `update_time`, `remark`) VALUES
 (2003, '客服工作台', 2000, 1, 'workbench', 'cs/workbench/index', NULL, '', 1, 0, 'C', '0', '0', 'cs:workbench:list', 'message', 'admin', '2026-04-27 15:39:51', 'admin', '2026-04-27 15:52:06', '客服工作台');
 INSERT INTO `ruoyi-chat`.`sys_menu` (`menu_id`, `menu_name`, `parent_id`, `order_num`, `path`, `component`, `query`, `route_name`, `is_frame`, `is_cache`, `menu_type`, `visible`, `status`, `perms`, `icon`, `create_by`, `create_time`, `update_by`, `update_time`, `remark`) VALUES
 (2004, '客服人员设置', 2000, 2, 'staff', 'cs/staff/index', NULL, '', 1, 0, 'C', '0', '0', 'cs:staff:list', 'peoples', 'admin', '2026-04-27 15:39:51', 'admin', '2026-04-27 15:52:13', '客服人员设置');
 INSERT INTO `ruoyi-chat`.`sys_menu` (`menu_id`, `menu_name`, `parent_id`, `order_num`, `path`, `component`, `query`, `route_name`, `is_frame`, `is_cache`, `menu_type`, `visible`, `status`, `perms`, `icon`, `create_by`, `create_time`, `update_by`, `update_time`, `remark`) VALUES
 (2005, '我的客服历史', 2000, 3, 'myHistory', 'cs/myHistory/index', NULL, '', 1, 0, 'C', '0', '0', 'cs:myHistory:list', 'log', 'admin', '2026-04-27 15:39:51', 'admin', '2026-04-27 15:52:34', '我的客服历史');
-INSERT INTO `ruoyi-chat`.`sys_menu` (`menu_id`, `menu_name`, `parent_id`, `order_num`, `path`, `component`, `query`, `route_name`, `is_frame`, `is_cache`, `menu_type`, `visible`, `status`, `perms`, `icon`, `create_by`, `create_time`, `update_by`, `update_time`, `remark`) VALUES
-(2006, '结束会话', 2001, 1, '', NULL, NULL, '', 1, 0, 'F', '0', '0', 'cs:workbench:close', '#', 'admin', '2026-04-27 15:39:51', 'admin', '2026-04-27 15:39:51', '');
-
 -- 7. 访客标签表
 CREATE TABLE IF NOT EXISTS `cs_visitor_tag` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',

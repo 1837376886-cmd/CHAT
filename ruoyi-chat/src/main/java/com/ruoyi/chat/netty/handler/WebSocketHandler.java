@@ -7,10 +7,8 @@ import com.ruoyi.chat.domain.entity.CsConfig;
 import com.ruoyi.chat.domain.entity.CsMessage;
 import com.ruoyi.chat.domain.entity.CsSession;
 import com.ruoyi.chat.protocol.ChatMessage;
-import com.ruoyi.chat.protocol.ContentType;
 import com.ruoyi.chat.protocol.MessageType;
 import com.ruoyi.chat.netty.manager.ConnectionManager;
-import com.ruoyi.chat.netty.router.MessageRouter;
 import com.ruoyi.chat.netty.session.UserSession;
 import com.ruoyi.chat.service.*;
 import com.ruoyi.common.core.domain.entity.SysUser;
@@ -25,7 +23,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.Date;
-import java.util.Map;
 
 /**
  * WebSocket消息处理器
@@ -39,15 +36,6 @@ public class WebSocketHandler extends SimpleChannelInboundHandler<WebSocketFrame
 
     @Autowired
     private ConnectionManager connectionManager;
-
-    @Autowired
-    private MessageRouter messageRouter;
-
-    @Autowired
-    private IChatMessageService chatMessageService;
-
-    @Autowired
-    private IChatSessionService chatSessionService;
 
     @Autowired
     private IChatVisitorService chatVisitorService;
@@ -86,8 +74,6 @@ public class WebSocketHandler extends SimpleChannelInboundHandler<WebSocketFrame
                 // 客服异常断线不立即标记为offline，由定时任务根据心跳超时处理（保留会话5分钟）
                 logger.info("客服WS断开: {} ({}), 不修改Redis在线状态，由心跳检查任务处理", user.getNickName(), userId);
             }
-            // 发送用户下线通知
-            messageRouter.sendUserStatusNotification(userId, "offline");
         }
 
         // 移除连接
@@ -126,10 +112,6 @@ public class WebSocketHandler extends SimpleChannelInboundHandler<WebSocketFrame
                     break;
                 case GUEST_AUTH:
                     handleGuestAuthMessage(ctx, message);
-                    break;
-                case PRIVATE_CHAT:
-                case GROUP_CHAT:
-                    handleChatMessage(ctx, message);
                     break;
                 case CS_CHAT:
                     handleCsChatMessage(ctx, message);
@@ -186,9 +168,6 @@ public class WebSocketHandler extends SimpleChannelInboundHandler<WebSocketFrame
                 redisManager.setCsStatus(userId, "online", maxSessions);
                 logger.info("客服上线: {} ({})", userNickname, userId);
             }
-
-            // 发送用户上线通知
-            messageRouter.sendUserStatusNotification(userId, "online");
 
             logger.info("用户认证成功: {} ({})", userNickname, userId);
         } catch (Exception e) {
@@ -346,66 +325,6 @@ public class WebSocketHandler extends SimpleChannelInboundHandler<WebSocketFrame
     }
 
     /**
-     * 处理聊天消息
-     */
-    private void handleChatMessage(ChannelHandlerContext ctx, ChatMessage message) {
-        try {
-            // 验证用户是否已认证
-            UserSession userSession = connectionManager.getUserSessionByChannel(ctx.channel().id());
-            if (userSession == null) {
-                logger.warn("未认证用户尝试发送消息");
-                sendErrorResponse(ctx, "请先进行身份认证");
-                return;
-            }
-            
-            // 验证用户是否在会话中
-            String sessionId = message.getSessionId();
-            Long userId = userSession.getUserId();
-            
-            if (!chatSessionService.isUserInSession(sessionId, userId)) {
-                logger.warn("用户 {} 不在会话 {} 中", userId, sessionId);
-                sendErrorResponse(ctx, "您不在此会话中");
-                return;
-            }
-            
-            // 设置消息发送者信息
-            message.setFromUserId(userId);
-            message.setTimestamp(new Date());
-            
-            // 生成消息ID
-            if (message.getMessageId() == null) {
-                message.setMessageId("msg_" + System.currentTimeMillis() + "_" + userId);
-            }
-            
-            // 保存消息到数据库
-            Integer messageType = getMessageTypeCode(message.getContentType());
-            chatMessageService.sendMessage(
-                sessionId,
-                userId,
-                messageType,
-                message.getContent(),
-                null
-            );
-            
-            // 路由消息到其他用户
-            messageRouter.routeMessage(message);
-            
-            // 发送消息确认
-            ChatMessage ackMessage = new ChatMessage();
-            ackMessage.setType(MessageType.AUTH_SUCCESS);
-            ackMessage.setMessageId(message.getMessageId());
-            ackMessage.setTimestamp(new Date());
-            
-            ctx.channel().writeAndFlush(new TextWebSocketFrame(JSON.toJSONString(ackMessage)));
-            
-            logger.debug("消息处理完成: {}", message.getMessageId());
-        } catch (Exception e) {
-            logger.error("处理聊天消息失败: {}", e.getMessage(), e);
-            sendErrorResponse(ctx, "消息发送失败");
-        }
-    }
-
-    /**
      * 处理心跳消息
      */
     private void handleHeartbeat(ChannelHandlerContext ctx, ChatMessage message) {
@@ -421,22 +340,6 @@ public class WebSocketHandler extends SimpleChannelInboundHandler<WebSocketFrame
         heartbeatResponse.setTimestamp(new Date());
 
         ctx.channel().writeAndFlush(new TextWebSocketFrame(JSON.toJSONString(heartbeatResponse)));
-    }
-
-    /**
-     * 将协议层 ContentType 映射为数据库整数消息类型
-     */
-    private Integer getMessageTypeCode(ContentType contentType) {
-        if (contentType == null) {
-            return 1;
-        }
-        switch (contentType) {
-            case TEXT:  return 1;
-            case IMAGE: return 2;
-            case EMOJI: return 3;
-            case FILE:  return 4;
-            default:    return 1;
-        }
     }
 
     /**

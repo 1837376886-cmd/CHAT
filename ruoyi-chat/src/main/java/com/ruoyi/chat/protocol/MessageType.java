@@ -17,31 +17,22 @@ public enum MessageType {
     
     /** 认证失败 */
     AUTH_FAILED,
-    
-    /** 单聊消息 */
-    PRIVATE_CHAT,
-    
-    /** 群聊消息 */
-    GROUP_CHAT,
 
     /** 客服消息 */
     CS_CHAT,
 
     /** 心跳包 */
     HEARTBEAT,
-    
+
     /** 心跳响应 */
     HEARTBEAT_RESPONSE,
-    
+
     /** 用户上线通知 */
     USER_ONLINE,
-    
+
     /** 用户下线通知 */
     USER_OFFLINE,
-    
-    /** 消息已读回执 */
-    MESSAGE_READ,
-    
+
     /** 系统通知 */
     SYSTEM_NOTICE,
     
