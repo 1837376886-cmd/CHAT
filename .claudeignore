@@ -1,0 +1,57 @@
+# 依赖目录——这是 Token 黑洞
+node_modules/
+vendor/
+.venv/
+__pycache__/
+
+# 构建产物
+dist/
+build/
+out/
+*.min.js
+*.min.css
+*.bundle.js
+
+# 锁文件——又大又没用（对 Claude 来说）
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+go.sum
+Cargo.lock
+poetry.lock
+composer.lock
+
+# 资源文件
+*.png
+*.jpg
+*.gif
+*.svg
+*.ico
+*.woff
+*.woff2
+*.ttf
+*.eot
+
+# 日志和临时文件
+*.log
+*.tmp
+.DS_Store
+Thumbs.db
+
+# 测试覆盖率报告
+coverage/
+.nyc_output/
+htmlcov/
+
+# IDE 配置（通常不需要 Claude 看）
+.idea/
+.vscode/settings.json
+*.swp
+*.swo
+
+# 大型数据文件
+*.sql
+*.csv
+*.xlsx
+data/
+fixtures/
