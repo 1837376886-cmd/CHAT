@@ -29,7 +29,9 @@
       "Bash(mv ruoyi-framework *)",
       "Bash(mv ruoyi-system *)",
       "Bash(mv ruoyi-common *)",
-      "Bash(mv ruoyi-chat *)"
+      "Bash(mv ruoyi-chat *)",
+      "Bash(pnpm install *)",
+      "Bash(pnpm run *)"
     ]
   }
 }

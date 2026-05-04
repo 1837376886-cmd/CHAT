@@ -8,7 +8,7 @@ import com.lytboot.chat.netty.ChatChannelHandler;
 import com.lytboot.chat.protocol.ChatMessage;
 import com.lytboot.chat.protocol.MessageType;
 import com.lytboot.common.core.domain.entity.SysUser;
-import com.lytboot.system.mapper.SysUserMapper;
+import com.lytboot.system.service.ISysUserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -27,7 +27,7 @@ public class CustomerServiceAllocationService {
     private CustomerServiceRedisManager redisManager;
 
     @Autowired
-    private SysUserMapper sysUserMapper;
+    private ISysUserService sysUserService;
 
     @Autowired
     private IChatVisitorService chatVisitorService;
@@ -96,7 +96,7 @@ public class CustomerServiceAllocationService {
         // 1. 检查是否已有进行中会话
         CsSession activeSession = csSessionService.selectActiveSessionByVisitorId(visitor.getId());
         if (activeSession != null) {
-            SysUser csUser = sysUserMapper.selectUserById(activeSession.getCsUserId());
+            SysUser csUser = sysUserService.selectUserById(activeSession.getCsUserId());
             return AllocationResult.success(activeSession.getId(), activeSession.getCsUserId(),
                     csUser != null ? csUser.getNickName() : "客服");
         }
@@ -104,7 +104,7 @@ public class CustomerServiceAllocationService {
         // 2. 上次客服优先（选项B：宽松策略）
         Long lastCsUserId = visitor.getLastCsUserId();
         if (lastCsUserId != null) {
-            SysUser lastCs = sysUserMapper.selectUserById(lastCsUserId);
+            SysUser lastCs = sysUserService.selectUserById(lastCsUserId);
             if (lastCs != null && Integer.valueOf(1).equals(lastCs.getIsCustomerService())) {
                 String status = redisManager.getCsStatus(lastCsUserId);
                 int activeCount = redisManager.getActiveCount(lastCsUserId);
@@ -125,7 +125,7 @@ public class CustomerServiceAllocationService {
         for (Long csId : onlineCsIds) {
             String pending = redisManager.getPending(csId);
             if (visitorToken.equals(pending)) {
-                SysUser cs = sysUserMapper.selectUserById(csId);
+                SysUser cs = sysUserService.selectUserById(csId);
                 redisManager.clearPending(csId);
                 return createSessionAndAssign(visitor, csId, cs != null ? cs.getNickName() : "客服");
             }
@@ -167,7 +167,7 @@ public class CustomerServiceAllocationService {
             return null;
         }
 
-        SysUser cs = sysUserMapper.selectUserById(targetCsId);
+        SysUser cs = sysUserService.selectUserById(targetCsId);
         return createSessionAndAssign(visitor, targetCsId, cs != null ? cs.getNickName() : "客服");
     }
 
@@ -252,7 +252,7 @@ public class CustomerServiceAllocationService {
                 return;
             }
 
-            SysUser cs = sysUserMapper.selectUserById(csUserId);
+            SysUser cs = sysUserService.selectUserById(csUserId);
             AllocationResult result = createSessionAndAssign(visitor, csUserId,
                     cs != null ? cs.getNickName() : "客服");
 
@@ -282,7 +282,7 @@ public class CustomerServiceAllocationService {
         int max = getMaxSessions(csUserId);
         if (active < max) {
             redisManager.clearPending(csUserId);
-            SysUser cs = sysUserMapper.selectUserById(csUserId);
+            SysUser cs = sysUserService.selectUserById(csUserId);
             createSessionAndAssign(visitor, csUserId, cs != null ? cs.getNickName() : "客服");
         }
     }

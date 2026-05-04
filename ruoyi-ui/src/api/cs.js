@@ -67,6 +67,13 @@ export function csStaffList() {
   })
 }
 
+export function csStaffCandidates() {
+  return request({
+    url: '/cs/staff/candidates',
+    method: 'get'
+  })
+}
+
 export function setCsStaff(data) {
   return request({
     url: '/cs/staff/set',

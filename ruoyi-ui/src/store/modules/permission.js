@@ -34,8 +34,10 @@ const permission = {
       return new Promise(resolve => {
         // 向后端请求路由数据
         getRouters().then(res => {
-          const sdata = JSON.parse(JSON.stringify(res.data))
-          const rdata = JSON.parse(JSON.stringify(res.data))
+          // 客服系统独立化：只展示客服相关菜单
+          const csRoutes = filterCsRoutes(res.data)
+          const sdata = JSON.parse(JSON.stringify(csRoutes))
+          const rdata = JSON.parse(JSON.stringify(csRoutes))
           const sidebarRoutes = filterAsyncRouter(sdata)
           const rewriteRoutes = filterAsyncRouter(rdata, false, true)
           const asyncRoutes = filterDynamicRoutes(dynamicRoutes)
@@ -50,6 +52,33 @@ const permission = {
       })
     }
   }
+}
+
+/**
+ * 客服系统独立化：过滤菜单树，只保留客服相关菜单 + 首页
+ */
+function filterCsRoutes(routes) {
+  if (!routes || !routes.length) {
+    return []
+  }
+  return routes.filter(route => {
+    // 首页保留
+    const path = route.path || ''
+    const component = route.component || ''
+    if (path === '' || path === '/' || path === 'index' || component === 'index') {
+      return true
+    }
+    // 客服相关保留
+    if (path.startsWith('/cs') || path.startsWith('cs') || component.includes('cs/')) {
+      return true
+    }
+    // 如果有子节点，递归过滤；过滤后仍有子节点的保留
+    if (route.children && route.children.length) {
+      route.children = filterCsRoutes(route.children)
+      return route.children.length > 0
+    }
+    return false
+  })
 }
 
 // 遍历后台传来的路由字符串，转换为组件对象

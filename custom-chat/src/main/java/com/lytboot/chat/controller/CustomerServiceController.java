@@ -8,19 +8,25 @@ import com.lytboot.chat.domain.entity.CsVisitorTag;
 import com.lytboot.chat.service.*;
 import com.lytboot.common.annotation.RateLimiter;
 import com.lytboot.common.core.domain.AjaxResult;
+import com.lytboot.common.core.domain.entity.SysRole;
 import com.lytboot.common.core.domain.entity.SysUser;
 import com.lytboot.common.enums.LimitType;
 import com.lytboot.common.utils.SecurityUtils;
+import com.lytboot.system.mapper.SysRoleMapper;
+import com.lytboot.system.service.ISysRoleService;
 import com.lytboot.system.service.ISysUserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import javax.annotation.PostConstruct;
 import javax.servlet.http.HttpServletRequest;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * 在线客服Controller
@@ -57,6 +63,28 @@ public class CustomerServiceController {
 
     @Autowired
     private com.lytboot.chat.netty.ChatChannelHandler chatChannelHandler;
+
+    @Autowired
+    private ISysRoleService sysRoleService;
+
+    @Autowired
+    private SysRoleMapper sysRoleMapper;
+
+    /** customerService 角色的 roleId，启动时缓存 */
+    private Long customerServiceRoleId;
+
+    @PostConstruct
+    public void initCsRoleId()
+    {
+        SysRole query = new SysRole();
+        query.setRoleKey("customerService");
+        // 直接走 Mapper 绕过 @DataScope，避免 @PostConstruct 阶段无登录用户
+        List<SysRole> list = sysRoleMapper.selectRoleList(query);
+        if (!list.isEmpty())
+        {
+            customerServiceRoleId = list.get(0).getRoleId();
+        }
+    }
 
     // ==================== 访客端接口（无需登录） ====================
 
@@ -501,18 +529,39 @@ public class CustomerServiceController {
     // ==================== 管理端接口 ====================
 
     /**
-     * 客服列表
+     * 客服列表（按角色查询）
      */
     @GetMapping("/staff/list")
     public AjaxResult getStaffList() {
-        SysUser query = new SysUser();
-        query.setIsCustomerService(1);
-        List<SysUser> list = sysUserService.selectUserList(query);
+        List<Long> csUserIds = sysRoleMapper.selectUserIdsByRoleKey("customerService");
+        if (csUserIds == null || csUserIds.isEmpty()) {
+            return AjaxResult.success(new ArrayList<>());
+        }
+        List<SysUser> list = new ArrayList<>();
+        for (Long userId : csUserIds) {
+            SysUser user = sysUserService.selectUserById(userId);
+            if (user != null) {
+                list.add(user);
+            }
+        }
         return AjaxResult.success(list);
     }
 
     /**
-     * 设置/取消客服身份
+     * 候选客服列表（未设为客服的用户）
+     */
+    @GetMapping("/staff/candidates")
+    public AjaxResult getStaffCandidates() {
+        List<Long> csUserIds = sysRoleMapper.selectUserIdsByRoleKey("customerService");
+        List<SysUser> allUsers = sysUserService.selectUserList(new SysUser());
+        List<SysUser> candidates = allUsers.stream()
+                .filter(u -> !csUserIds.contains(u.getUserId()))
+                .collect(Collectors.toList());
+        return AjaxResult.success(candidates);
+    }
+
+    /**
+     * 设置/取消客服身份（操作角色关联）
      */
     @PostMapping("/staff/set")
     public AjaxResult setStaff(@RequestBody Map<String, Object> params) {
@@ -524,16 +573,22 @@ public class CustomerServiceController {
             return AjaxResult.error("用户不存在");
         }
 
+        if (customerServiceRoleId == null) {
+            return AjaxResult.error("系统未配置 customerService 角色");
+        }
+
         // 取消客服身份时，若该客服在线则禁止操作
         if (Integer.valueOf(0).equals(isCs)) {
             String status = redisManager.getCsStatus(userId);
             if ("online".equals(status)) {
                 return AjaxResult.error("该客服当前在线，请先下线后再取消客服身份");
             }
+            // 删除角色关联
+            sysRoleService.deleteAuthUsers(customerServiceRoleId, new Long[]{userId});
+        } else {
+            // 新增角色关联
+            sysRoleService.insertAuthUsers(customerServiceRoleId, new Long[]{userId});
         }
-
-        user.setIsCustomerService(isCs);
-        sysUserService.updateUser(user);
 
         return AjaxResult.success();
     }

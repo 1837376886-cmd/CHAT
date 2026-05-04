@@ -7,12 +7,14 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
+import java.util.Set;
 import com.lytboot.common.core.domain.entity.SysUser;
 import com.lytboot.common.core.domain.model.LoginUser;
 import com.lytboot.common.enums.UserStatus;
 import com.lytboot.common.exception.ServiceException;
 import com.lytboot.common.utils.MessageUtils;
 import com.lytboot.common.utils.StringUtils;
+import com.lytboot.system.service.ISysRoleService;
 import com.lytboot.system.service.ISysUserService;
 
 /**
@@ -33,6 +35,9 @@ public class UserDetailsServiceImpl implements UserDetailsService
 
     @Autowired
     private SysPermissionService permissionService;
+
+    @Autowired
+    private ISysRoleService roleService;
 
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException
@@ -61,6 +66,11 @@ public class UserDetailsServiceImpl implements UserDetailsService
 
     public UserDetails createLoginUser(SysUser user)
     {
+        Set<String> roleKeys = roleService.selectRolePermissionByUserId(user.getUserId());
+        if (roleKeys != null && (roleKeys.contains("customerService") || roleKeys.contains("admin")))
+        {
+            user.setIsCustomerService(1);
+        }
         return new LoginUser(user.getUserId(), user.getDeptId(), user, permissionService.getMenuPermission(user));
     }
 }

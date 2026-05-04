@@ -148,5 +148,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
  			#{roleId}
         </foreach> 
  	</delete>
- 	
+
+    <select id="selectUserIdsByRoleKey" parameterType="String" resultType="Long">
+        SELECT DISTINCT ur.user_id
+        FROM sys_user_role ur
+        INNER JOIN sys_role r ON ur.role_id = r.role_id
+        WHERE r.role_key = #{roleKey} AND r.del_flag = '0'
+    </select>
+
 </mapper> 

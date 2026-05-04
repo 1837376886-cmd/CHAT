@@ -1,5 +1,6 @@
 package com.lytboot.framework.web.service;
 
+import java.util.Set;
 import javax.annotation.Resource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -52,6 +53,9 @@ public class SysLoginService
     @Autowired
     private ISysConfigService configService;
 
+    @Autowired
+    private SysPermissionService permissionService;
+
     /**
      * 登录验证
      * 
@@ -95,7 +99,16 @@ public class SysLoginService
         }
         AsyncManager.me().execute(AsyncFactory.recordLogininfor(username, Constants.LOGIN_SUCCESS, MessageUtils.message("user.login.success")));
         LoginUser loginUser = (LoginUser) authentication.getPrincipal();
-        recordLoginInfo(loginUser.getUserId());
+        SysUser user = loginUser.getUser();
+        // 客服系统独立化：仅允许 customerService 角色或 admin 登录
+        Set<String> roleKeys = permissionService.getRolePermission(user);
+        if (!roleKeys.contains("customerService") && !roleKeys.contains("admin"))
+        {
+            AsyncManager.me().execute(AsyncFactory.recordLogininfor(username, Constants.LOGIN_FAIL, "无权登录客服系统，请联系管理员分配客服角色"));
+            throw new ServiceException("无权登录客服系统，请联系管理员分配客服角色");
+        }
+        // 从库只读，不再更新 sys_user 的登录信息（由另一套若依系统维护）
+        // recordLoginInfo(loginUser.getUserId());
         // 生成token
         return tokenService.createToken(loginUser);
     }

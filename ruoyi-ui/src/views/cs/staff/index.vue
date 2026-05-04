@@ -75,8 +75,7 @@
 </template>
 
 <script>
-import { setCsStaff, getCsConfig, saveCsConfig } from '@/api/cs'
-import { listUser } from '@/api/system/user'
+import { setCsStaff, getCsConfig, saveCsConfig, csStaffList, csStaffCandidates } from '@/api/cs'
 
 export default {
   name: 'CsStaff',
@@ -103,9 +102,8 @@ export default {
   methods: {
     getList() {
       this.loading = true
-      listUser({ pageSize: 999 }).then(res => {
-        const allUsers = res.rows || []
-        this.staffList = allUsers.filter(u => u.isCustomerService === 1)
+      csStaffList().then(res => {
+        this.staffList = res.data || []
         // 逐个加载客服配置补充默认回复语
         this.staffList.forEach(staff => {
           getCsConfig(staff.userId).then(cfgRes => {
@@ -119,8 +117,8 @@ export default {
       })
     },
     handleAdd() {
-      listUser({ pageSize: 999 }).then(res => {
-        this.userList = (res.rows || []).filter(u => u.isCustomerService !== 1)
+      csStaffCandidates().then(res => {
+        this.userList = res.data || []
         this.dialogVisible = true
       })
     },

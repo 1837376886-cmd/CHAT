@@ -99,9 +99,17 @@ public interface SysRoleMapper
 
     /**
      * 批量删除角色信息
-     * 
+     *
      * @param roleIds 需要删除的角色ID
      * @return 结果
      */
     public int deleteRoleByIds(Long[] roleIds);
+
+    /**
+     * 根据角色权限查询拥有该角色的用户ID列表
+     *
+     * @param roleKey 角色权限
+     * @return 用户ID列表
+     */
+    public List<Long> selectUserIdsByRoleKey(String roleKey);
 }

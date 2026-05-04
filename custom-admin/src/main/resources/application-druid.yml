@@ -9,13 +9,13 @@ spring:
                 url: jdbc:mysql://localhost:3306/ruoyi-chat?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=true&serverTimezone=GMT%2B8
                 username: root
                 password: yl990404
-            # 从库数据源
+            # 从库数据源（另一套若依系统，只读系统数据）
             slave:
-                # 从数据源开关/默认关闭
-                enabled: false
-                url: 
-                username: 
-                password: 
+                # 从数据源开关
+                enabled: true
+                url: jdbc:mysql://localhost:3306/ruoyi-chat?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=true&serverTimezone=GMT%2B8
+                username: root
+                password: yl990404
             # 初始连接数
             initialSize: 5
             # 最小连接池数量

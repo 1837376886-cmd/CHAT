@@ -49,18 +49,6 @@
             <artifactId>custom-framework</artifactId>
         </dependency>
 
-        <!-- 定时任务-->
-        <dependency>
-            <groupId>com.lytboot</groupId>
-            <artifactId>custom-quartz</artifactId>
-        </dependency>
-
-        <!-- 代码生成-->
-        <dependency>
-            <groupId>com.lytboot</groupId>
-            <artifactId>custom-generator</artifactId>
-        </dependency>
-
         <dependency>
             <groupId>com.lytboot</groupId>
             <artifactId>custom-chat</artifactId>

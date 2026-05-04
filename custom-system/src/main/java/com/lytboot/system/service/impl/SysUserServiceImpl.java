@@ -10,7 +10,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
+import java.util.Set;
+import com.lytboot.common.annotation.DataSource;
 import com.lytboot.common.annotation.DataScope;
+import com.lytboot.common.enums.DataSourceType;
+import com.lytboot.system.service.ISysRoleService;
 import com.lytboot.common.constant.UserConstants;
 import com.lytboot.common.core.domain.entity.SysRole;
 import com.lytboot.common.core.domain.entity.SysUser;
@@ -63,6 +67,9 @@ public class SysUserServiceImpl implements ISysUserService
     private ISysDeptService deptService;
 
     @Autowired
+    private ISysRoleService roleService;
+
+    @Autowired
     protected Validator validator;
 
     /**
@@ -113,19 +120,36 @@ public class SysUserServiceImpl implements ISysUserService
     @Override
     public SysUser selectUserByUserName(String userName)
     {
-        return userMapper.selectUserByUserName(userName);
+        SysUser user = userMapper.selectUserByUserName(userName);
+        fillCustomerServiceFlag(user);
+        return user;
     }
 
     /**
      * 通过用户ID查询用户
-     * 
+     *
      * @param userId 用户ID
      * @return 用户对象信息
      */
     @Override
     public SysUser selectUserById(Long userId)
     {
-        return userMapper.selectUserById(userId);
+        SysUser user = userMapper.selectUserById(userId);
+        fillCustomerServiceFlag(user);
+        return user;
+    }
+
+    private void fillCustomerServiceFlag(SysUser user)
+    {
+        if (user == null)
+        {
+            return;
+        }
+        Set<String> roleKeys = roleService.selectRolePermissionByUserId(user.getUserId());
+        if (roleKeys != null && (roleKeys.contains("customerService") || roleKeys.contains("admin")))
+        {
+            user.setIsCustomerService(1);
+        }
     }
 
     /**
@@ -258,6 +282,7 @@ public class SysUserServiceImpl implements ISysUserService
      */
     @Override
     @Transactional
+    @DataSource(DataSourceType.MASTER)
     public int insertUser(SysUser user)
     {
         // 新增用户信息
@@ -276,6 +301,7 @@ public class SysUserServiceImpl implements ISysUserService
      * @return 结果
      */
     @Override
+    @DataSource(DataSourceType.MASTER)
     public boolean registerUser(SysUser user)
     {
         return userMapper.insertUser(user) > 0;
@@ -289,6 +315,7 @@ public class SysUserServiceImpl implements ISysUserService
      */
     @Override
     @Transactional
+    @DataSource(DataSourceType.MASTER)
     public int updateUser(SysUser user)
     {
         Long userId = user.getUserId();
@@ -311,6 +338,7 @@ public class SysUserServiceImpl implements ISysUserService
      */
     @Override
     @Transactional
+    @DataSource(DataSourceType.MASTER)
     public void insertUserAuth(Long userId, Long[] roleIds)
     {
         userRoleMapper.deleteUserRoleByUserId(userId);
@@ -324,6 +352,7 @@ public class SysUserServiceImpl implements ISysUserService
      * @return 结果
      */
     @Override
+    @DataSource(DataSourceType.MASTER)
     public int updateUserStatus(SysUser user)
     {
         return userMapper.updateUser(user);
@@ -336,6 +365,7 @@ public class SysUserServiceImpl implements ISysUserService
      * @return 结果
      */
     @Override
+    @DataSource(DataSourceType.MASTER)
     public int updateUserProfile(SysUser user)
     {
         return userMapper.updateUser(user);
@@ -349,6 +379,7 @@ public class SysUserServiceImpl implements ISysUserService
      * @return 结果
      */
     @Override
+    @DataSource(DataSourceType.MASTER)
     public boolean updateUserAvatar(Long userId, String avatar)
     {
         return userMapper.updateUserAvatar(userId, avatar) > 0;
@@ -361,6 +392,7 @@ public class SysUserServiceImpl implements ISysUserService
      * @return 结果
      */
     @Override
+    @DataSource(DataSourceType.MASTER)
     public int resetPwd(SysUser user)
     {
         return userMapper.updateUser(user);
@@ -374,6 +406,7 @@ public class SysUserServiceImpl implements ISysUserService
      * @return 结果
      */
     @Override
+    @DataSource(DataSourceType.MASTER)
     public int resetUserPwd(Long userId, String password)
     {
         return userMapper.resetUserPwd(userId, password);
@@ -443,6 +476,7 @@ public class SysUserServiceImpl implements ISysUserService
      */
     @Override
     @Transactional
+    @DataSource(DataSourceType.MASTER)
     public int deleteUserById(Long userId)
     {
         // 删除用户与角色关联
@@ -460,6 +494,7 @@ public class SysUserServiceImpl implements ISysUserService
      */
     @Override
     @Transactional
+    @DataSource(DataSourceType.MASTER)
     public int deleteUserByIds(Long[] userIds)
     {
         for (Long userId : userIds)
@@ -483,6 +518,7 @@ public class SysUserServiceImpl implements ISysUserService
      * @return 结果
      */
     @Override
+    @DataSource(DataSourceType.MASTER)
     public String importUser(List<SysUser> userList, Boolean isUpdateSupport, String operName)
     {
         if (StringUtils.isNull(userList) || userList.size() == 0)
