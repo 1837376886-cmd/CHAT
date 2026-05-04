@@ -75,13 +75,12 @@ public class CustomerServiceController {
         String ip = getClientIp(request);
         String userAgent = request.getHeader("User-Agent");
         String sourcePage = params.get("sourcePage");
-        String deviceFingerprint = params.get("deviceFingerprint");
 
-        ChatVisitor visitor = chatVisitorService.getOrCreateVisitor(visitorToken, ip, userAgent, sourcePage, deviceFingerprint);
+        ChatVisitor visitor = chatVisitorService.getOrCreateVisitor(visitorToken, ip, userAgent, sourcePage);
 
         CustomerServiceAllocationService.AllocationResult result = allocationService.allocate(visitor);
 
-        // 必须使用数据库中访客的实际token（getOrCreateVisitor可能按设备指纹/IP复用了旧访客）
+        // 必须使用数据库中访客的实际token（getOrCreateVisitor可能按IP复用了旧访客）
         String actualToken = visitor.getVisitorToken();
 
         Map<String, Object> data = new HashMap<>();
@@ -234,12 +233,7 @@ public class CustomerServiceController {
         for (CsSession session : sessions) {
             ChatVisitor visitor = chatVisitorService.getById(session.getVisitorId());
             if (visitor != null) {
-                if (visitor.getBoundUserId() != null) {
-                    SysUser boundUser = sysUserService.selectUserById(visitor.getBoundUserId());
-                    session.setVisitorNickname(boundUser != null ? boundUser.getNickName() : visitor.getNickname());
-                } else {
-                    session.setVisitorNickname(visitor.getNickname());
-                }
+                session.setVisitorNickname(visitor.getNickname());
             } else {
                 session.setVisitorNickname("访客_" + session.getVisitorId());
             }
@@ -353,18 +347,7 @@ public class CustomerServiceController {
 
         // 填充发送者名称
         ChatVisitor visitor = chatVisitorService.getById(session.getVisitorId());
-        String visitorName = null;
-        if (visitor != null) {
-            if (visitor.getBoundUserId() != null) {
-                SysUser boundUser = sysUserService.selectUserById(visitor.getBoundUserId());
-                visitorName = boundUser != null ? boundUser.getNickName() : visitor.getNickname();
-            } else {
-                visitorName = visitor.getNickname();
-            }
-        }
-        if (visitorName == null) {
-            visitorName = "访客";
-        }
+        String visitorName = visitor != null ? visitor.getNickname() : "访客";
 
         for (CsMessage msg : messages) {
             if (msg.getFromType() == CsMessage.FromType.VISITOR) {
@@ -404,13 +387,7 @@ public class CustomerServiceController {
         data.put("ip", maskIp(visitor.getIp()));
         data.put("userAgent", visitor.getUserAgent());
         data.put("sourcePage", visitor.getSourcePage());
-        data.put("deviceFingerprint", visitor.getDeviceFingerprint());
         data.put("createTime", visitor.getCreateTime());
-        data.put("boundUserId", visitor.getBoundUserId());
-        if (visitor.getBoundUserId() != null) {
-            SysUser boundUser = sysUserService.selectUserById(visitor.getBoundUserId());
-            data.put("boundUserNickName", boundUser != null ? boundUser.getNickName() : null);
-        }
         return AjaxResult.success(data);
     }
 
@@ -431,18 +408,7 @@ public class CustomerServiceController {
         List<CsMessage> messages = csMessageService.selectMessagesByVisitorId(visitorId);
 
         // 填充发送者名称
-        String visitorName = null;
-        if (visitor != null) {
-            if (visitor.getBoundUserId() != null) {
-                SysUser boundUser = sysUserService.selectUserById(visitor.getBoundUserId());
-                visitorName = boundUser != null ? boundUser.getNickName() : visitor.getNickname();
-            } else {
-                visitorName = visitor.getNickname();
-            }
-        }
-        if (visitorName == null) {
-            visitorName = "访客";
-        }
+        String visitorName = visitor != null ? visitor.getNickname() : "访客";
         for (CsMessage msg : messages) {
             if (msg.getFromType() == CsMessage.FromType.VISITOR) {
                 msg.setSenderName(visitorName);
@@ -496,27 +462,7 @@ public class CustomerServiceController {
             List<CsMessage> messages = csMessageService.selectMessagesBySessionId(sessionId);
             return AjaxResult.success(messages);
         }
-        // 访客视角：绑定的访客会话
-        ChatVisitor visitor = chatVisitorService.getById(session.getVisitorId());
-        if (visitor != null && user.getUserId().equals(visitor.getBoundUserId())) {
-            List<CsMessage> messages = csMessageService.selectMessagesBySessionId(sessionId);
-            return AjaxResult.success(messages);
-        }
         return AjaxResult.error("无权查看");
-    }
-
-    /**
-     * 我的客服历史（访客视角：我咨询过的记录）
-     */
-    @GetMapping("/my/history")
-    public AjaxResult getMyHistory() {
-        SysUser user = SecurityUtils.getLoginUser().getUser();
-        List<CsSession> sessions = csSessionService.list(
-                new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<CsSession>()
-                        .inSql("visitor_id", "SELECT id FROM chat_visitor WHERE bound_user_id = " + user.getUserId())
-                        .orderByDesc("create_time")
-        );
-        return AjaxResult.success(sessions);
     }
 
     /**
@@ -540,12 +486,7 @@ public class CustomerServiceController {
         for (CsSession session : page.getRecords()) {
             ChatVisitor visitor = chatVisitorService.getById(session.getVisitorId());
             if (visitor != null) {
-                if (visitor.getBoundUserId() != null) {
-                    SysUser boundUser = sysUserService.selectUserById(visitor.getBoundUserId());
-                    session.setVisitorNickname(boundUser != null ? boundUser.getNickName() : visitor.getNickname());
-                } else {
-                    session.setVisitorNickname(visitor.getNickname());
-                }
+                session.setVisitorNickname(visitor.getNickname());
             } else {
                 session.setVisitorNickname("访客_" + session.getVisitorId());
             }
@@ -555,20 +496,6 @@ public class CustomerServiceController {
         data.put("rows", page.getRecords());
         data.put("total", page.getTotal());
         return AjaxResult.success(data);
-    }
-
-    /**
-     * 确认绑定匿名客服历史（按设备指纹）
-     */
-    @PostMapping("/bind/confirm")
-    public AjaxResult confirmBind(@RequestBody Map<String, String> params) {
-        SysUser user = SecurityUtils.getLoginUser().getUser();
-        String deviceFingerprint = params.get("deviceFingerprint");
-        if (deviceFingerprint == null || deviceFingerprint.isEmpty()) {
-            return AjaxResult.error("缺少设备指纹");
-        }
-        int count = chatVisitorService.bindByLogin(user.getUserId(), deviceFingerprint);
-        return AjaxResult.success("已绑定 " + count + " 条历史记录");
     }
 
     // ==================== 管理端接口 ====================

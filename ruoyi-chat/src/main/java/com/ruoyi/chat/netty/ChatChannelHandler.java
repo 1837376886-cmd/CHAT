@@ -279,12 +279,7 @@ public class ChatChannelHandler extends SimpleChannelInboundHandler<TextWebSocke
                     sendErrorMessage(ctx, "无权发送消息到此会话");
                     return;
                 }
-                if (visitor.getBoundUserId() != null) {
-                    SysUser boundUser = sysUserService.selectUserById(visitor.getBoundUserId());
-                    senderNickname = boundUser != null ? boundUser.getNickName() : visitor.getNickname();
-                } else {
-                    senderNickname = visitor.getNickname();
-                }
+                senderNickname = visitor.getNickname();
             } else {
                 logger.warn("CS_CHAT未认证的发送者");
                 sendErrorMessage(ctx, "请先进行身份认证");

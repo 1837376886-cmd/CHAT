@@ -13,16 +13,12 @@ CREATE TABLE IF NOT EXISTS `chat_visitor` (
   `ip` varchar(64) DEFAULT NULL COMMENT 'IP地址',
   `user_agent` varchar(500) DEFAULT NULL COMMENT '浏览器UA',
   `source_page` varchar(255) DEFAULT NULL COMMENT '来源页面URL',
-  `bound_user_id` bigint DEFAULT NULL COMMENT '已绑定的sys_user.id（登录后回填，用于历史关联）',
   `last_cs_user_id` bigint DEFAULT NULL COMMENT '最近一次接待该访客的客服userId（用于优先分配）',
-  `device_fingerprint` varchar(64) DEFAULT NULL COMMENT '设备指纹（用于区分同一IP下不同设备）',
   `last_session_end_time` datetime DEFAULT NULL COMMENT '最近一次会话结束时间',
   `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_visitor_token` (`visitor_token`),
   KEY `idx_ip` (`ip`),
-  KEY `idx_device_fingerprint` (`device_fingerprint`),
-  KEY `idx_bound_user_id` (`bound_user_id`),
   KEY `idx_create_time` (`create_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='访客信息表';
 

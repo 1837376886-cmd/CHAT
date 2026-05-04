@@ -90,26 +90,11 @@ export function saveCsConfig(data) {
   })
 }
 
-export function getMyCsHistory() {
-  return request({
-    url: '/cs/my/history',
-    method: 'get'
-  })
-}
-
 export function getCsMyHistory(params) {
   return request({
     url: '/cs/my/csHistory',
     method: 'get',
     params
-  })
-}
-
-export function confirmBindHistory(deviceFingerprint) {
-  return request({
-    url: '/cs/bind/confirm',
-    method: 'post',
-    data: { deviceFingerprint }
   })
 }
 

@@ -59,18 +59,6 @@ public class ChatVisitor implements Serializable {
     private String sourcePage;
 
     /**
-     * 设备指纹
-     */
-    @TableField("device_fingerprint")
-    private String deviceFingerprint;
-
-    /**
-     * 已绑定的sys_user.id
-     */
-    @TableField("bound_user_id")
-    private Long boundUserId;
-
-    /**
      * 最近一次接待该访客的客服userId
      */
     @TableField("last_cs_user_id")

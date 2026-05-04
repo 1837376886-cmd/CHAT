@@ -9,8 +9,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
-import com.ruoyi.chat.service.IChatVisitorService;
-import com.ruoyi.chat.domain.entity.ChatVisitor;
 import com.ruoyi.common.constant.Constants;
 import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.core.domain.entity.SysMenu;
@@ -51,12 +49,6 @@ public class SysLoginController
     @Autowired
     private ISysConfigService configService;
 
-    @Autowired
-    private ISysUserService sysUserService;
-
-    @Autowired
-    private IChatVisitorService chatVisitorService;
-
     /**
      * 登录方法
      *
@@ -72,30 +64,7 @@ public class SysLoginController
                 loginBody.getUuid());
         ajax.put(Constants.TOKEN, token);
 
-        // 登录成功后按设备指纹绑定匿名访客记录
-        SysUser user = sysUserService.selectUserByUserName(loginBody.getUsername());
-        if (user != null && StringUtils.isNotEmpty(loginBody.getDeviceFingerprint())) {
-            chatVisitorService.bindByLogin(user.getUserId(), loginBody.getDeviceFingerprint());
-        }
-
         return ajax;
-    }
-
-    private String getClientIp(HttpServletRequest request) {
-        String ip = request.getHeader("X-Forwarded-For");
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getHeader("Proxy-Client-IP");
-        }
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getHeader("WL-Proxy-Client-IP");
-        }
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getRemoteAddr();
-        }
-        if (ip != null && ip.contains(",")) {
-            ip = ip.split(",")[0].trim();
-        }
-        return ip;
     }
 
     /**

@@ -150,19 +150,8 @@
           <div class="cs-info-value">{{ visitorDetail ? visitorDetail.nickname : '-' }}</div>
         </div>
         <div class="cs-info-item">
-          <div class="cs-info-label">绑定用户</div>
-          <div class="cs-info-value">
-            <el-tag v-if="visitorDetail && visitorDetail.boundUserId" size="small" type="success">{{ visitorDetail.boundUserNickName || visitorDetail.boundUserId }}</el-tag>
-            <span v-else class="cs-info-muted">未绑定</span>
-          </div>
-        </div>
-        <div class="cs-info-item">
           <div class="cs-info-label">IP地址</div>
           <div class="cs-info-value">{{ visitorDetail ? visitorDetail.ip : '-' }}</div>
-        </div>
-        <div class="cs-info-item">
-          <div class="cs-info-label">设备指纹</div>
-          <div class="cs-info-value cs-info-ellipsis" :title="visitorDetail ? visitorDetail.deviceFingerprint : ''">{{ visitorDetail ? visitorDetail.deviceFingerprint : '-' }}</div>
         </div>
         <div class="cs-info-item">
           <div class="cs-info-label">浏览器 / 设备</div>

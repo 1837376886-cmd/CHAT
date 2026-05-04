@@ -109,7 +109,6 @@ export default {
       isOpen: false,
       confirmed: false,
       visitorToken: localStorage.getItem('cs_visitor_token') || '',
-      deviceFingerprint: localStorage.getItem('cs_device_fp') || '',
       sessionId: null,
       csUserId: null,
       csNickname: null,
@@ -143,10 +142,6 @@ export default {
   methods: {
     openChat() {
       this.isOpen = true
-      if (!this.deviceFingerprint) {
-        this.deviceFingerprint = this.generateFingerprint()
-        localStorage.setItem('cs_device_fp', this.deviceFingerprint)
-      }
       if (!this.visitorToken) {
         this.visitorToken = this.generateToken()
         localStorage.setItem('cs_visitor_token', this.visitorToken)
@@ -189,15 +184,10 @@ export default {
     generateToken() {
       return 'v_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9)
     },
-    generateFingerprint() {
-      const { generateFingerprint } = require('@/utils/deviceFingerprint')
-      return generateFingerprint()
-    },
     async doConnect() {
       try {
         const res = await csConnect({
           visitorToken: this.visitorToken,
-          deviceFingerprint: this.deviceFingerprint,
           sourcePage: window.location.href
         })
         const data = res.data

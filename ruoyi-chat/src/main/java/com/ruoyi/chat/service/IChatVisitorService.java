@@ -15,7 +15,7 @@ public interface IChatVisitorService extends IService<ChatVisitor> {
     /**
      * 根据访客Token获取或创建访客
      */
-    ChatVisitor getOrCreateVisitor(String visitorToken, String ip, String userAgent, String sourcePage, String deviceFingerprint);
+    ChatVisitor getOrCreateVisitor(String visitorToken, String ip, String userAgent, String sourcePage);
 
     /**
      * 根据访客Token查询
@@ -28,22 +28,7 @@ public interface IChatVisitorService extends IService<ChatVisitor> {
     void updateLastCsUserId(Long visitorId, Long csUserId);
 
     /**
-     * 登录后按设备指纹绑定访客记录
-     */
-    int bindByLogin(Long userId, String deviceFingerprint);
-
-    /**
-     * 根据IP查询未绑定的访客列表
-     */
-    List<ChatVisitor> selectUnboundByIp(String ip, int days);
-
-    /**
      * 根据IP查询最近活跃的访客
      */
     ChatVisitor selectRecentByIp(String ip, int days);
-
-    /**
-     * 根据设备指纹查询访客
-     */
-    ChatVisitor selectByDeviceFingerprint(String deviceFingerprint, int days);
 }
