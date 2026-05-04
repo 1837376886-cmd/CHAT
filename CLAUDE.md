@@ -18,19 +18,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **后端**：Java 1.8、Spring Boot 2.5.15、Spring Security 5.7.12、MyBatis + MyBatis-Plus 3.5.3.1、Netty 4.2.4、Redis、Druid、JWT、Swagger 3、PageHelper
 - **前端**：Vue 2.6.12、Element UI 2.15.14、Vue CLI 4.4.6、Axios、ECharts 5.4.0
-- **数据库**：MySQL（配置在 `ruoyi-admin/src/main/resources/application-druid.yml`）
+- **数据库**：MySQL（配置在 `custom-admin/src/main/resources/application-druid.yml`）
 
 ## 模块结构
 
 | 模块 | 职责 |
 |------|------|
-| `ruoyi-admin` | Spring Boot 启动入口（`RuoYiApplication`），HTTP 端口 8080 |
-| `ruoyi-framework` | 框架配置：安全、数据源、MyBatis、AOP、登录服务、JWT 过滤器 |
-| `ruoyi-system` | 系统管理：用户、角色、菜单、部门、字典。改造完成后应从从库读取 |
-| `ruoyi-common` | 公共工具类、常量、基础领域类 |
-| `ruoyi-chat` | 客服业务：Netty WebSocket 服务器（端口 9999）、会话、消息、访客、客服配置、转接 |
-| `ruoyi-generator` | 代码生成（改造方案建议移除） |
-| `ruoyi-quartz` | 定时任务（改造方案建议移除） |
+| `custom-admin` | Spring Boot 启动入口（`RuoYiApplication`），HTTP 端口 8080 |
+| `custom-framework` | 框架配置：安全、数据源、MyBatis、AOP、登录服务、JWT 过滤器 |
+| `custom-system` | 系统管理：用户、角色、菜单、部门、字典。改造完成后应从从库读取 |
+| `custom-common` | 公共工具类、常量、基础领域类 |
+| `custom-chat` | 客服业务：Netty WebSocket 服务器（端口 9999）、会话、消息、访客、客服配置、转接 |
+| `custom-generator` | 代码生成（改造方案建议移除） |
+| `custom-quartz` | 定时任务（改造方案建议移除） |
 | `ruoyi-ui` | Vue 前端，开发服务器端口 80，代理 `/dev-api` 到 `localhost:8080`，代理 `/ws` 到 `ws://localhost:9999` |
 
 ## 常用命令
@@ -42,10 +42,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 mvn clean compile
 
 # 运行应用（从项目根目录）
-mvn spring-boot:run -pl ruoyi-admin
+mvn spring-boot:run -pl custom-admin
 
 # 或在 IDE 中直接运行 RuoYiApplication
-# 位置：ruoyi-admin/src/main/java/com/ruoyi/RuoYiApplication.java
+# 位置：custom-admin/src/main/java/com/lytboot/RuoYiApplication.java
 
 # 生产打包
 mvn clean package -DskipTests
@@ -83,19 +83,19 @@ npm run build:stage
 Netty 在 `NettyWebSocketServer.java` 中通过 `@PostConstruct` 在独立线程中启动。前端开发代理（`vue.config.js`）将 `/ws` 路由到 `ws://localhost:9999`。注意，这**不是** Spring 自带的 WebSocket，而是基于 `WebSocketServerProtocolHandler` 的原始 Netty 启动器。
 
 关键文件：
-- `ruoyi-chat/src/main/java/com/ruoyi/chat/netty/NettyWebSocketServer.java`
-- `ruoyi-chat/src/main/java/com/ruoyi/chat/netty/ChatChannelHandler.java`
+- `custom-chat/src/main/java/com/lytboot/chat/netty/NettyWebSocketServer.java`
+- `custom-chat/src/main/java/com/lytboot/chat/netty/ChatChannelHandler.java`
 - `ruoyi-ui/vue.config.js`（代理配置）
 
 ### MyBatis + MyBatis-Plus 混合使用
 
-原有若依模块（`ruoyi-system`、`ruoyi-framework`）使用**原生 MyBatis** 配合 XML Mapper。`ruoyi-chat` 模块引入了 **MyBatis-Plus 3.5.3.1**，使用以下特性：
+原有若依模块（`custom-system`、`custom-framework`）使用**原生 MyBatis** 配合 XML Mapper。`custom-chat` 模块引入了 **MyBatis-Plus 3.5.3.1**，使用以下特性：
 - `QueryWrapper` / `LambdaQueryWrapper` 做动态查询
 - `BaseMapper`、`IService`、`ServiceImpl` 做 CRUD
 - `Page<T>` 做分页
 - `MybatisPlusInterceptor` 配合 `PaginationInnerInterceptor`（注册在 `MyBatisConfig.java`）
 
-`ruoyi-framework` 的 `MyBatisConfig` 使用 `MybatisSqlSessionFactoryBean`（而非 `SqlSessionFactoryBean`），以便在同一个工厂中同时支持 MyBatis-Plus 和原生 XML Mapper。
+`custom-framework` 的 `MyBatisConfig` 使用 `MybatisSqlSessionFactoryBean`（而非 `SqlSessionFactoryBean`），以便在同一个工厂中同时支持 MyBatis-Plus 和原生 XML Mapper。
 
 ### 客服权限模型
 
@@ -124,7 +124,7 @@ if (!Integer.valueOf(1).equals(user.getIsCustomerService())) {
 - **访客会话绑定**：`visitor:session:{token}` — 访客 token 映射到当前 `cs_session.id`
 - **转接请求**：临时的 Redis 条目，用于客服之间的会话转接
 
-管理类：`CustomerServiceRedisManager`（`ruoyi-chat` 模块）。
+管理类：`CustomerServiceRedisManager`（`custom-chat` 模块）。
 
 ### 访客生命周期与分配
 
@@ -152,13 +152,13 @@ SQL 文件位于 `sql/` 目录：
 - `ry_20250522.sql` — 若依基础数据
 - `quartz.sql` — Quartz 定时任务表
 
-当前数据源配置：`ruoyi-admin/src/main/resources/application-druid.yml`
-- 单数据源，指向 `ruoyi-chat` 数据库
+当前数据源配置：`custom-admin/src/main/resources/application-druid.yml`
+- 单数据源，指向 `custom-chat` 数据库
 - 改造方案计划改用 `dynamic-datasource-spring-boot-starter` 实现 `master` + `slave` 多数据源，但**尚未实施**
 
 ## 关键配置
 
-- **应用配置**：`ruoyi-admin/src/main/resources/application.yml`
+- **应用配置**：`custom-admin/src/main/resources/application.yml`
   - HTTP 端口：8080
   - Netty WS 端口：9999（`chat.netty.port`）
   - Token 有效期：30 分钟
@@ -182,6 +182,6 @@ SQL 文件位于 `sql/` 目录：
 
 - **代码库中没有测试**。所有验证必须通过手动测试或运行应用完成。
 - `RuoYiApplication` 的 `@SpringBootApplication` 显式排除了 `DataSourceAutoConfiguration.class`，因为若依通过 `DruidConfig` / `MyBatisConfig` 手动配置数据源。
-- `ruoyi-chat` 依赖 `ruoyi-system` 的 `ISysUserService`，若两模块继续膨胀需注意循环依赖风险。当前依赖关系为 `ruoyi-chat → ruoyi-system → ruoyi-common`。
-- `ruoyi-chat` 使用了 Lombok，老模块中基本未使用。
+- `custom-chat` 依赖 `custom-system` 的 `ISysUserService`，若两模块继续膨胀需注意循环依赖风险。当前依赖关系为 `custom-chat → custom-system → custom-common`。
+- `custom-chat` 使用了 Lombok，老模块中基本未使用。
 - `application.yml` 中的文件上传路径被硬编码为某位开发者的 macOS 本机路径，在其他环境运行时需要修改。

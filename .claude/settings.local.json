@@ -19,7 +19,17 @@
       "Bash(/c/maven/apache-maven-3.8.4/bin/mvn.cmd clean *)",
       "Bash(/c/maven/apache-maven-3.8.4/bin/mvn.cmd package *)",
       "Bash(mvn package *)",
-      "Bash(export PATH=\"/c/maven/apache-maven-3.8.4/bin:$PATH\")"
+      "Bash(export PATH=\"/c/maven/apache-maven-3.8.4/bin:$PATH\")",
+      "Bash(cp sedtest.txt sedtest2.txt)",
+      "Bash(sed -i.bak 's/ruoyi/custom/g' sedtest2.txt)",
+      "Bash(cp sedtest.txt sedtest3.txt)",
+      "Bash(sed -i'' 's/ruoyi/custom/g' sedtest3.txt)",
+      "Bash(xargs rm *)",
+      "Bash(mv ruoyi-admin *)",
+      "Bash(mv ruoyi-framework *)",
+      "Bash(mv ruoyi-system *)",
+      "Bash(mv ruoyi-common *)",
+      "Bash(mv ruoyi-chat *)"
     ]
   }
 }
