@@ -35,6 +35,12 @@ public class CsConfig implements Serializable {
     private Long userId;
 
     /**
+     * 客服别名（访客可见）
+     */
+    @TableField("nick_name")
+    private String nickName;
+
+    /**
      * 最大同时接待数
      */
     @TableField("max_sessions")

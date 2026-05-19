@@ -258,8 +258,8 @@ public class ChatChannelHandler extends SimpleChannelInboundHandler<TextWebSocke
             if (userId != null) {
                 // 已登录用户（客服）
                 senderUserId = userId;
-                SysUser user = sysUserService.selectUserById(userId);
-                senderNickname = user != null ? user.getNickName() : "客服";
+                CsConfig csCfg = csConfigService.getOrCreateDefault(userId);
+                senderNickname = csCfg != null && csCfg.getNickName() != null ? csCfg.getNickName() : "客服";
                 if (!session.getCsUserId().equals(senderUserId)) {
                     logger.warn("CS_CHAT客服无权发送, sessionId={}, senderUserId={}", sessionId, senderUserId);
                     sendErrorMessage(ctx, "无权发送消息到此会话");

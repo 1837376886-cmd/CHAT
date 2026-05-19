@@ -31,7 +31,12 @@
       "Bash(mv ruoyi-common *)",
       "Bash(mv ruoyi-chat *)",
       "Bash(pnpm install *)",
-      "Bash(pnpm run *)"
+      "Bash(pnpm run *)",
+      "Bash(python3 -c \"import docx; print\\('python-docx available'\\)\")",
+      "Bash(python -c \"import docx; print\\('python-docx available'\\)\")",
+      "Bash(pip install *)",
+      "Bash(python -c \"import docx; print\\('installed'\\)\")",
+      "Bash(/c/maven/apache-maven-3.8.4/bin/mvn.cmd compile *)"
     ]
   }
 }

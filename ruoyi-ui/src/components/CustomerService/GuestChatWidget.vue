@@ -146,6 +146,10 @@ export default {
         this.visitorToken = this.generateToken()
         localStorage.setItem('cs_visitor_token', this.visitorToken)
       }
+      // 关闭窗口后重新打开，若会话仍在进行则重建连接
+      if (!this.wsClient && this.confirmed && !this.sessionEnded) {
+        this.initWebSocket()
+      }
     },
     closeChat() {
       if (this.waiting || this.waitingForLastCs) {
@@ -164,6 +168,10 @@ export default {
               clearTimeout(this.reconnectTimer)
               this.reconnectTimer = null
             }
+            if (this.wsClient) {
+              this.wsClient.close()
+              this.wsClient = null
+            }
           })
         }).catch(() => {
           // 用户选择继续排队，不做任何操作
@@ -173,6 +181,10 @@ export default {
       this.isOpen = false
       if (!this.sessionId) {
         this.confirmed = false
+      }
+      if (this.wsClient) {
+        this.wsClient.close()
+        this.wsClient = null
       }
     },
     async startConsult() {
@@ -257,6 +269,10 @@ export default {
     handleWsMessage(msg) {
       if (msg.type === MessageType.AUTH_SUCCESS) {
         console.log('访客WS认证成功')
+        // 重连后拉取最新历史，补回断线期间错过的消息
+        if (this.sessionId) {
+          this.loadHistory()
+        }
         return
       }
       if (msg.type === MessageType.AUTH_FAILED) {

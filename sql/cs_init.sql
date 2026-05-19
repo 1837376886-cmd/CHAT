@@ -56,6 +56,7 @@ CREATE TABLE IF NOT EXISTS `cs_message` (
 CREATE TABLE IF NOT EXISTS `cs_config` (
   `id` bigint NOT NULL AUTO_INCREMENT,
   `user_id` bigint NOT NULL COMMENT '客服用户ID',
+  `nick_name` varchar(50) DEFAULT NULL COMMENT '客服别名（访客可见）',
   `max_sessions` int DEFAULT 5 COMMENT '最大同时接待数',
   `auto_reply` varchar(500) DEFAULT NULL COMMENT '自动回复语',
   `status` tinyint DEFAULT 1 COMMENT '状态：0-禁用，1-启用',

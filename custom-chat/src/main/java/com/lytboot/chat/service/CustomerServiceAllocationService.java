@@ -96,9 +96,8 @@ public class CustomerServiceAllocationService {
         // 1. 检查是否已有进行中会话
         CsSession activeSession = csSessionService.selectActiveSessionByVisitorId(visitor.getId());
         if (activeSession != null) {
-            SysUser csUser = sysUserService.selectUserById(activeSession.getCsUserId());
             return AllocationResult.success(activeSession.getId(), activeSession.getCsUserId(),
-                    csUser != null ? csUser.getNickName() : "客服");
+                    getCsNickname(activeSession.getCsUserId()));
         }
 
         // 2. 上次客服优先（选项B：宽松策略）
@@ -112,7 +111,7 @@ public class CustomerServiceAllocationService {
 
                 if ("online".equals(status) && activeCount < maxSessions) {
                     // 上次客服在线且有容量 -> 直接分配
-                    return createSessionAndAssign(visitor, lastCsUserId, lastCs.getNickName());
+                    return createSessionAndAssign(visitor, lastCsUserId, getCsNickname(lastCsUserId));
                 }
 
                 // 上次客服离线或已满 -> 直接走默认分配，不等待
@@ -125,9 +124,8 @@ public class CustomerServiceAllocationService {
         for (Long csId : onlineCsIds) {
             String pending = redisManager.getPending(csId);
             if (visitorToken.equals(pending)) {
-                SysUser cs = sysUserService.selectUserById(csId);
                 redisManager.clearPending(csId);
-                return createSessionAndAssign(visitor, csId, cs != null ? cs.getNickName() : "客服");
+                return createSessionAndAssign(visitor, csId, getCsNickname(csId));
             }
         }
 
@@ -167,8 +165,7 @@ public class CustomerServiceAllocationService {
             return null;
         }
 
-        SysUser cs = sysUserService.selectUserById(targetCsId);
-        return createSessionAndAssign(visitor, targetCsId, cs != null ? cs.getNickName() : "客服");
+        return createSessionAndAssign(visitor, targetCsId, getCsNickname(targetCsId));
     }
 
     /**
@@ -212,6 +209,18 @@ public class CustomerServiceAllocationService {
     }
 
     /**
+     * 获取客服别名（优先 cs_config，回退 sys_user）
+     */
+    private String getCsNickname(Long csUserId) {
+        CsConfig cfg = csConfigService.getOrCreateDefault(csUserId);
+        if (cfg != null && cfg.getNickName() != null && !cfg.getNickName().isEmpty()) {
+            return cfg.getNickName();
+        }
+        SysUser user = sysUserService.selectUserById(csUserId);
+        return user != null ? user.getNickName() : "客服";
+    }
+
+    /**
      * 获取客服最大接待数
      */
     private int getMaxSessions(Long csUserId) {
@@ -252,9 +261,8 @@ public class CustomerServiceAllocationService {
                 return;
             }
 
-            SysUser cs = sysUserService.selectUserById(csUserId);
             AllocationResult result = createSessionAndAssign(visitor, csUserId,
-                    cs != null ? cs.getNickName() : "客服");
+                    getCsNickname(csUserId));
 
             // TODO: 通过WebSocket推送分配成功消息给访客
             // 这里暂时不处理WebSocket推送，留给消息路由层处理
@@ -282,8 +290,7 @@ public class CustomerServiceAllocationService {
         int max = getMaxSessions(csUserId);
         if (active < max) {
             redisManager.clearPending(csUserId);
-            SysUser cs = sysUserService.selectUserById(csUserId);
-            createSessionAndAssign(visitor, csUserId, cs != null ? cs.getNickName() : "客服");
+            createSessionAndAssign(visitor, csUserId, getCsNickname(csUserId));
         }
     }
 }

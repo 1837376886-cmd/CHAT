@@ -381,8 +381,8 @@ public class CustomerServiceController {
             if (msg.getFromType() == CsMessage.FromType.VISITOR) {
                 msg.setSenderName(visitorName);
             } else if (msg.getFromType() == CsMessage.FromType.CS) {
-                SysUser csUser = sysUserService.selectUserById(msg.getFromUserId());
-                msg.setSenderName(csUser != null ? csUser.getNickName() : "客服");
+                CsConfig csCfg = csConfigService.getOrCreateDefault(msg.getFromUserId());
+                msg.setSenderName(csCfg != null && csCfg.getNickName() != null ? csCfg.getNickName() : "客服");
             } else {
                 msg.setSenderName("系统");
             }
@@ -441,8 +441,8 @@ public class CustomerServiceController {
             if (msg.getFromType() == CsMessage.FromType.VISITOR) {
                 msg.setSenderName(visitorName);
             } else if (msg.getFromType() == CsMessage.FromType.CS) {
-                SysUser csUser = sysUserService.selectUserById(msg.getFromUserId());
-                msg.setSenderName(csUser != null ? csUser.getNickName() : "客服");
+                CsConfig csCfg = csConfigService.getOrCreateDefault(msg.getFromUserId());
+                msg.setSenderName(csCfg != null && csCfg.getNickName() != null ? csCfg.getNickName() : "客服");
             } else {
                 msg.setSenderName("系统");
             }
@@ -541,6 +541,10 @@ public class CustomerServiceController {
         for (Long userId : csUserIds) {
             SysUser user = sysUserService.selectUserById(userId);
             if (user != null) {
+                CsConfig cfg = csConfigService.getOrCreateDefault(userId);
+                if (cfg != null && cfg.getNickName() != null) {
+                    user.setNickName(cfg.getNickName());
+                }
                 list.add(user);
             }
         }
@@ -602,11 +606,10 @@ public class CustomerServiceController {
         if (!Integer.valueOf(1).equals(currentUser.getIsCustomerService()) && !currentUser.isAdmin()) {
             return AjaxResult.error("无权访问");
         }
-        SysUser user = sysUserService.selectUserById(userId);
         CsConfig config = csConfigService.getOrCreateDefault(userId);
         Map<String, Object> data = new HashMap<>();
         data.put("userId", userId);
-        data.put("nickName", user != null ? user.getNickName() : "");
+        data.put("nickName", config.getNickName());
         data.put("autoReply", config.getAutoReply());
         data.put("maxSessions", config.getMaxSessions());
         return AjaxResult.success(data);
@@ -633,12 +636,10 @@ public class CustomerServiceController {
             return AjaxResult.error("客服当前在线，请先下线后再修改配置");
         }
 
-        if (nickName != null) {
-            user.setNickName(nickName);
-            sysUserService.updateUser(user);
-        }
-
         CsConfig config = csConfigService.getOrCreateDefault(userId);
+        if (nickName != null) {
+            config.setNickName(nickName);
+        }
         if (autoReply != null) {
             config.setAutoReply(autoReply);
         }
@@ -677,9 +678,10 @@ public class CustomerServiceController {
             if (active < max) {
                 SysUser cs = sysUserService.selectUserById(csId);
                 if (cs != null) {
+                    CsConfig cfg = csConfigService.getOrCreateDefault(csId);
                     Map<String, Object> map = new HashMap<>();
                     map.put("userId", csId);
-                    map.put("nickName", cs.getNickName());
+                    map.put("nickName", cfg != null && cfg.getNickName() != null ? cfg.getNickName() : cs.getNickName());
                     map.put("activeCount", active);
                     map.put("maxSessions", max);
                     result.add(map);
@@ -719,9 +721,11 @@ public class CustomerServiceController {
         // 推送转接请求给目标客服B
         ChatVisitor visitor = chatVisitorService.getById(session.getVisitorId());
         String visitorNickname = visitor != null ? visitor.getNickname() : "访客";
+        CsConfig fromCsCfg = csConfigService.getOrCreateDefault(user.getUserId());
+        String fromCsNickname = fromCsCfg != null && fromCsCfg.getNickName() != null ? fromCsCfg.getNickName() : user.getNickName();
         com.lytboot.chat.protocol.ChatMessage wsMsg = new com.lytboot.chat.protocol.ChatMessage(com.lytboot.chat.protocol.MessageType.CS_TRANSFER_REQUEST);
         wsMsg.setFromUserId(user.getUserId());
-        wsMsg.setFromUserNickname(user.getNickName());
+        wsMsg.setFromUserNickname(fromCsNickname);
         wsMsg.setSessionId(String.valueOf(sessionId));
         wsMsg.setContent(reason != null ? reason : "");
         wsMsg.setMessageId(transferId);
@@ -774,10 +778,16 @@ public class CustomerServiceController {
         Long visitorId = oldSession.getVisitorId();
         ChatVisitor visitor = chatVisitorService.getById(visitorId);
 
+        CsConfig toCsCfg = csConfigService.getOrCreateDefault(user.getUserId());
+        String toCsNickname = toCsCfg != null && toCsCfg.getNickName() != null ? toCsCfg.getNickName() : user.getNickName();
+        SysUser fromCsUser = sysUserService.selectUserById(fromCsUserId);
+        CsConfig fromCsCfg2 = csConfigService.getOrCreateDefault(fromCsUserId);
+        String fromCsNickname2 = fromCsCfg2 != null && fromCsCfg2.getNickName() != null ? fromCsCfg2.getNickName() : (fromCsUser != null ? fromCsUser.getNickName() : "客服");
+
         // 1. 结束旧会话
         csSessionService.closeSession(sessionId);
         redisManager.decrementActiveCount(fromCsUserId);
-        csMessageService.sendSystemMessage(sessionId, "会话已转接给客服 " + user.getNickName());
+        csMessageService.sendSystemMessage(sessionId, "会话已转接给客服 " + toCsNickname);
 
         // 2. 创建新会话
         CsSession newSession = csSessionService.createSession(visitorId, user.getUserId());
@@ -788,7 +798,7 @@ public class CustomerServiceController {
         }
 
         // 3. 系统消息通知新会话
-        String systemContent = "客服 " + user.getNickName() + " 已接入（由 " + sysUserService.selectUserById(fromCsUserId).getNickName() + " 转接）";
+        String systemContent = "客服 " + toCsNickname + " 已接入（由 " + fromCsNickname2 + " 转接）";
         if (reason != null && !reason.isEmpty()) {
             systemContent += "，转接原因：" + reason;
         }
@@ -800,7 +810,7 @@ public class CustomerServiceController {
         acceptMsg.setSessionId(String.valueOf(sessionId));
         Map<String, Object> acceptExtra = new HashMap<>();
         acceptExtra.put("newSessionId", newSession.getId());
-        acceptExtra.put("toCsNickname", user.getNickName());
+        acceptExtra.put("toCsNickname", toCsNickname);
         acceptMsg.setExtra(acceptExtra);
         chatChannelHandler.sendMessageToUser(fromCsUserId, acceptMsg);
 
@@ -809,7 +819,7 @@ public class CustomerServiceController {
             com.lytboot.chat.protocol.ChatMessage visitorMsg = new com.lytboot.chat.protocol.ChatMessage(com.lytboot.chat.protocol.MessageType.CS_TRANSFER_RESULT);
             visitorMsg.setContent(systemContent);
             visitorMsg.setSessionId(String.valueOf(newSession.getId()));
-            visitorMsg.setFromUserNickname(user.getNickName());
+            visitorMsg.setFromUserNickname(toCsNickname);
             chatChannelHandler.sendMessageToVisitor(visitor.getVisitorToken(), visitorMsg);
         }
 
@@ -847,9 +857,11 @@ public class CustomerServiceController {
         }
         Long fromCsUserId = Long.valueOf(request.get("fromCsUserId").toString());
 
+        CsConfig rejectCsCfg = csConfigService.getOrCreateDefault(user.getUserId());
+        String rejectCsNickname = rejectCsCfg != null && rejectCsCfg.getNickName() != null ? rejectCsCfg.getNickName() : user.getNickName();
         com.lytboot.chat.protocol.ChatMessage rejectMsg = new com.lytboot.chat.protocol.ChatMessage(com.lytboot.chat.protocol.MessageType.CS_TRANSFER_REJECT);
         rejectMsg.setContent("对方拒绝了转接请求");
-        rejectMsg.setFromUserNickname(user.getNickName());
+        rejectMsg.setFromUserNickname(rejectCsNickname);
         chatChannelHandler.sendMessageToUser(fromCsUserId, rejectMsg);
 
         redisManager.setTransferStatus(transferId, "REJECTED");
