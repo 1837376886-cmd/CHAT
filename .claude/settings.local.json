@@ -36,7 +36,24 @@
       "Bash(python -c \"import docx; print\\('python-docx available'\\)\")",
       "Bash(pip install *)",
       "Bash(python -c \"import docx; print\\('installed'\\)\")",
-      "Bash(/c/maven/apache-maven-3.8.4/bin/mvn.cmd compile *)"
+      "Bash(/c/maven/apache-maven-3.8.4/bin/mvn.cmd compile *)",
+      "Bash(python3 *)",
+      "Bash(java -cp \"custom-common/target/classes\" -jar custom-common/target/*.jar)",
+      "Bash(node -e ' *)",
+      "Bash(npx -y xlsx-cli \"C:/project/V2/CHAT/竞拍/竞拍字段.xlsx\")",
+      "Bash(python -c \"import openpyxl; print\\('openpyxl ok'\\)\")",
+      "Bash(python -c \"import pandas; print\\('pandas ok'\\)\")",
+      "Bash(python -c \"import openpyxl; print\\('installed'\\)\")",
+      "Bash(py --version)",
+      "Bash(pip3 install *)",
+      "Bash(powershell *)",
+      "Bash(npm --version)",
+      "Bash(npm install *)",
+      "Bash(node *)",
+      "Bash(python -c \"import pandas as pd; df = pd.read_excel\\('C:/project/V2/CHAT/竞拍/竞拍字段.xlsx', sheet_name=None\\); [print\\(f'=== Sheet: {name} ==='\\); print\\(df[name].to_string\\(index=False\\)\\); print\\(\\)  for name in df.keys\\(\\)]\")",
+      "Bash(python -c \"import openpyxl; wb=openpyxl.load_workbook\\('C:/project/V2/CHAT/竞拍/竞拍字段.xlsx'\\); [print\\(f'=== Sheet: {name} ==='\\); ws=wb[name]; [print\\('\\\\t'.join\\([str\\(c.value\\) if c.value is not None else '' for c in row]\\)\\) for row in ws.iter_rows\\(\\)]; print\\(\\) for name in wb.sheetnames]\")",
+      "Bash(find /c -name \"mvn.cmd\")",
+      "Bash(find /c -name \"mvn.bat\")"
     ]
   }
 }

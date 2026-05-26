@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.lytboot.auction.mapper.AuctionDepositRefundMapper">
+
+    <resultMap id="BaseResultMap" type="com.lytboot.auction.domain.entity.AuctionDepositRefund">
+        <id column="id" property="id" jdbcType="BIGINT"/>
+        <result column="activity_id" property="activityId" jdbcType="BIGINT"/>
+        <result column="user_id" property="userId" jdbcType="BIGINT"/>
+        <result column="deposit_amount" property="depositAmount" jdbcType="DECIMAL"/>
+        <result column="refund_price" property="refundPrice" jdbcType="DECIMAL"/>
+        <result column="actual_refund_price" property="actualRefundPrice" jdbcType="DECIMAL"/>
+        <result column="pay_type" property="payType" jdbcType="VARCHAR"/>
+        <result column="refund_voucher" property="refundVoucher" jdbcType="VARCHAR"/>
+        <result column="create_by" property="createBy" jdbcType="BIGINT"/>
+        <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
+        <result column="update_by" property="updateBy" jdbcType="BIGINT"/>
+        <result column="update_time" property="updateTime" jdbcType="TIMESTAMP"/>
+        <result column="remark" property="remark" jdbcType="VARCHAR"/>
+    </resultMap>
+
+    <select id="selectByActivityId" resultMap="BaseResultMap">
+        SELECT * FROM auction_deposit_refund WHERE activity_id = #{activityId}
+    </select>
+
+</mapper>

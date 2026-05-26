@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.lytboot.auction.mapper.AuctionBidMapper">
+
+    <resultMap id="BaseResultMap" type="com.lytboot.auction.domain.entity.AuctionBid">
+        <id column="id" property="id" jdbcType="BIGINT"/>
+        <result column="activity_id" property="activityId" jdbcType="BIGINT"/>
+        <result column="user_id" property="userId" jdbcType="BIGINT"/>
+        <result column="real_name" property="realName" jdbcType="VARCHAR"/>
+        <result column="random_nick_name" property="randomNickName" jdbcType="VARCHAR"/>
+        <result column="bid_price" property="bidPrice" jdbcType="DECIMAL"/>
+        <result column="bid_time" property="bidTime" jdbcType="TIMESTAMP"/>
+        <result column="create_by" property="createBy" jdbcType="BIGINT"/>
+        <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
+        <result column="update_by" property="updateBy" jdbcType="BIGINT"/>
+        <result column="update_time" property="updateTime" jdbcType="TIMESTAMP"/>
+        <result column="remark" property="remark" jdbcType="VARCHAR"/>
+    </resultMap>
+
+    <select id="getBidCount" resultType="java.lang.Integer">
+        SELECT COUNT(*) FROM auction_bid WHERE activity_id = #{activityId}
+    </select>
+
+    <select id="selectByActivityId" resultMap="BaseResultMap">
+        SELECT * FROM auction_bid WHERE activity_id = #{activityId} ORDER BY bid_time DESC
+    </select>
+
+    <select id="selectHighestBid" resultMap="BaseResultMap">
+        SELECT * FROM auction_bid WHERE activity_id = #{activityId} ORDER BY bid_price DESC LIMIT 1
+    </select>
+
+</mapper>

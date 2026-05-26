@@ -47,3 +47,4 @@ nbdist/
 !*/build/*.xml
 
 temp/
+/node_modules/

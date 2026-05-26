@@ -224,6 +224,13 @@
                 <version>${project.version}</version>
             </dependency>
 
+            <!-- 拍卖模块 -->
+            <dependency>
+                <groupId>com.lytboot</groupId>
+                <artifactId>custom-auction</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
             <!-- Netty -->
             <dependency>
                 <groupId>io.netty</groupId>
@@ -248,6 +255,7 @@
         <module>custom-generator</module>
         <module>custom-common</module>
         <module>custom-chat</module>
+        <module>custom-auction</module>
     </modules>
     <packaging>pom</packaging>
 

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.lytboot.auction.mapper.AuctionDepositMapper">
+
+    <resultMap id="BaseResultMap" type="com.lytboot.auction.domain.entity.AuctionDeposit">
+        <id column="id" property="id" jdbcType="BIGINT"/>
+        <result column="activity_id" property="activityId" jdbcType="BIGINT"/>
+        <result column="user_id" property="userId" jdbcType="BIGINT"/>
+        <result column="deposit_amount" property="depositAmount" jdbcType="DECIMAL"/>
+        <result column="pay_type" property="payType" jdbcType="VARCHAR"/>
+        <result column="pay_status" property="payStatus" jdbcType="VARCHAR"/>
+        <result column="is_deduct" property="isDeduct" jdbcType="VARCHAR"/>
+        <result column="pay_voucher" property="payVoucher" jdbcType="VARCHAR"/>
+        <result column="pay_trade_no" property="payTradeNo" jdbcType="VARCHAR"/>
+        <result column="pay_time" property="payTime" jdbcType="TIMESTAMP"/>
+        <result column="audit_status" property="auditStatus" jdbcType="VARCHAR"/>
+        <result column="audit_by" property="auditBy" jdbcType="BIGINT"/>
+        <result column="audit_time" property="auditTime" jdbcType="TIMESTAMP"/>
+        <result column="audit_remark" property="auditRemark" jdbcType="VARCHAR"/>
+        <result column="refund_time" property="refundTime" jdbcType="TIMESTAMP"/>
+        <result column="refund_trade_no" property="refundTradeNo" jdbcType="VARCHAR"/>
+        <result column="create_by" property="createBy" jdbcType="BIGINT"/>
+        <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
+        <result column="update_by" property="updateBy" jdbcType="BIGINT"/>
+        <result column="update_time" property="updateTime" jdbcType="TIMESTAMP"/>
+        <result column="remark" property="remark" jdbcType="VARCHAR"/>
+    </resultMap>
+
+    <select id="selectByActivityAndUser" resultMap="BaseResultMap">
+        SELECT * FROM auction_deposit WHERE activity_id = #{activityId} AND user_id = #{userId} LIMIT 1
+    </select>
+
+    <select id="selectPaidByActivity" resultMap="BaseResultMap">
+        SELECT * FROM auction_deposit WHERE activity_id = #{activityId} AND pay_status = '1'
+    </select>
+
+</mapper>

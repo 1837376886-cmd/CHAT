@@ -22,6 +22,11 @@ chat:
     worker-threads: 8
     websocket-path: /ws
 
+# 拍卖模块配置
+auction:
+  scheduler:
+    pool-size: 8
+
 # 开发环境配置
 server:
   # 服务器的HTTP端口，默认为8081

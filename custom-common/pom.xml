@@ -29,6 +29,12 @@
             <artifactId>spring-web</artifactId>
         </dependency>
 
+        <!-- SpringMVC模块 -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-webmvc</artifactId>
+        </dependency>
+
         <!-- spring security 安全认证 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

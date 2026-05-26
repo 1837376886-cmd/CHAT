@@ -24,6 +24,8 @@ public class TableDataInfo implements Serializable
     /** 消息内容 */
     private String msg;
 
+    private boolean encrypted;
+
     /**
      * 表格数据对象
      */
@@ -81,5 +83,13 @@ public class TableDataInfo implements Serializable
     public void setMsg(String msg)
     {
         this.msg = msg;
+    }
+
+    public boolean isEncrypted() {
+        return encrypted;
+    }
+
+    public void setEncrypted(boolean encrypted) {
+        this.encrypted = encrypted;
     }
 }

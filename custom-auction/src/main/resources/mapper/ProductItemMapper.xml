@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.lytboot.auction.mapper.ProductItemMapper">
+
+    <resultMap id="BaseResultMap" type="com.lytboot.auction.domain.entity.ProductItem">
+        <id column="id" property="id" jdbcType="BIGINT"/>
+        <result column="product_code" property="productCode" jdbcType="VARCHAR"/>
+        <result column="product_name" property="productName" jdbcType="VARCHAR"/>
+        <result column="category_id" property="categoryId" jdbcType="VARCHAR"/>
+        <result column="cover_img" property="coverImg" jdbcType="VARCHAR"/>
+        <result column="item_img" property="itemImg" jdbcType="VARCHAR"/>
+        <result column="province" property="province" jdbcType="VARCHAR"/>
+        <result column="city" property="city" jdbcType="VARCHAR"/>
+        <result column="address" property="address" jdbcType="VARCHAR"/>
+        <result column="contact_person" property="contactPerson" jdbcType="VARCHAR"/>
+        <result column="contact_phone" property="contactPhone" jdbcType="VARCHAR"/>
+        <result column="apply_status" property="applyStatus" jdbcType="VARCHAR"/>
+        <result column="source" property="source" jdbcType="VARCHAR"/>
+        <result column="product_file" property="productFile" jdbcType="VARCHAR"/>
+        <result column="create_by" property="createBy" jdbcType="BIGINT"/>
+        <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
+        <result column="update_by" property="updateBy" jdbcType="BIGINT"/>
+        <result column="update_time" property="updateTime" jdbcType="TIMESTAMP"/>
+        <result column="remark" property="remark" jdbcType="VARCHAR"/>
+    </resultMap>
+
+    <select id="selectByProductCode" resultMap="BaseResultMap">
+        SELECT * FROM product_item WHERE product_code = #{productCode} LIMIT 1
+    </select>
+
+</mapper>

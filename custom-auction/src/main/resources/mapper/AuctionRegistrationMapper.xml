@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.lytboot.auction.mapper.AuctionRegistrationMapper">
+
+    <resultMap id="BaseResultMap" type="com.lytboot.auction.domain.entity.AuctionRegistration">
+        <id column="id" property="id" jdbcType="BIGINT"/>
+        <result column="activity_id" property="activityId" jdbcType="BIGINT"/>
+        <result column="user_id" property="userId" jdbcType="BIGINT"/>
+        <result column="real_name" property="realName" jdbcType="VARCHAR"/>
+        <result column="phone" property="phone" jdbcType="VARCHAR"/>
+        <result column="register_time" property="registerTime" jdbcType="TIMESTAMP"/>
+        <result column="audit_status" property="auditStatus" jdbcType="VARCHAR"/>
+        <result column="audit_by" property="auditBy" jdbcType="BIGINT"/>
+        <result column="audit_time" property="auditTime" jdbcType="TIMESTAMP"/>
+        <result column="audit_remark" property="auditRemark" jdbcType="VARCHAR"/>
+        <result column="random_nick_name" property="randomNickName" jdbcType="VARCHAR"/>
+        <result column="is_eligible" property="isEligible" jdbcType="VARCHAR"/>
+        <result column="registration_file" property="registrationFile" jdbcType="VARCHAR"/>
+        <result column="create_by" property="createBy" jdbcType="BIGINT"/>
+        <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
+        <result column="update_by" property="updateBy" jdbcType="BIGINT"/>
+        <result column="update_time" property="updateTime" jdbcType="TIMESTAMP"/>
+        <result column="remark" property="remark" jdbcType="VARCHAR"/>
+    </resultMap>
+
+    <select id="selectByActivityAndUser" resultMap="BaseResultMap">
+        SELECT * FROM auction_registration WHERE activity_id = #{activityId} AND user_id = #{userId} LIMIT 1
+    </select>
+
+    <update id="updateEligible">
+        UPDATE auction_registration SET is_eligible = #{isEligible} WHERE id = #{id}
+    </update>
+
+</mapper>

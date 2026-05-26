@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.lytboot.auction.mapper.AuctionActivityMapper">
+
+    <resultMap id="BaseResultMap" type="com.lytboot.auction.domain.entity.AuctionActivity">
+        <id column="id" property="id" jdbcType="BIGINT"/>
+        <result column="parent_id" property="parentId" jdbcType="BIGINT"/>
+        <result column="product_id" property="productId" jdbcType="BIGINT"/>
+        <result column="activity_code" property="activityCode" jdbcType="VARCHAR"/>
+        <result column="activity_name" property="activityName" jdbcType="VARCHAR"/>
+        <result column="estimated_price" property="estimatedPrice" jdbcType="DECIMAL"/>
+        <result column="activity_start_time" property="activityStartTime" jdbcType="TIMESTAMP"/>
+        <result column="activity_end_time" property="activityEndTime" jdbcType="TIMESTAMP"/>
+        <result column="register_start_time" property="registerStartTime" jdbcType="TIMESTAMP"/>
+        <result column="register_end_time" property="registerEndTime" jdbcType="TIMESTAMP"/>
+        <result column="take_item_time" property="takeItemTime" jdbcType="TIMESTAMP"/>
+        <result column="take_item_type" property="takeItemType" jdbcType="VARCHAR"/>
+        <result column="auction_start_time" property="auctionStartTime" jdbcType="TIMESTAMP"/>
+        <result column="auction_end_time" property="auctionEndTime" jdbcType="TIMESTAMP"/>
+        <result column="actual_end_time" property="actualEndTime" jdbcType="TIMESTAMP"/>
+        <result column="starting_price" property="startingPrice" jdbcType="DECIMAL"/>
+        <result column="deposit_price" property="depositPrice" jdbcType="DECIMAL"/>
+        <result column="incr_step" property="incrStep" jdbcType="DECIMAL"/>
+        <result column="time_step" property="timeStep" jdbcType="INTEGER"/>
+        <result column="tax_point" property="taxPoint" jdbcType="VARCHAR"/>
+        <result column="commission" property="commission" jdbcType="VARCHAR"/>
+        <result column="current_price" property="currentPrice" jdbcType="DECIMAL"/>
+        <result column="current_price_user_id" property="currentPriceUserId" jdbcType="BIGINT"/>
+        <result column="bid_count" property="bidCount" jdbcType="INTEGER"/>
+        <result column="view_count" property="viewCount" jdbcType="INTEGER"/>
+        <result column="status" property="status" jdbcType="VARCHAR"/>
+        <result column="estimated_size" property="estimatedSize" jdbcType="DECIMAL"/>
+        <result column="unit" property="unit" jdbcType="VARCHAR"/>
+        <result column="survey_time" property="surveyTime" jdbcType="TIMESTAMP"/>
+        <result column="platform_manager" property="platformManager" jdbcType="VARCHAR"/>
+        <result column="platform_manager_phone" property="platformManagerPhone" jdbcType="VARCHAR"/>
+        <result column="audit_status" property="auditStatus" jdbcType="VARCHAR"/>
+        <result column="audit_remark" property="auditRemark" jdbcType="VARCHAR"/>
+        <result column="file" property="file" jdbcType="VARCHAR"/>
+        <result column="product_type" property="productType" jdbcType="VARCHAR"/>
+        <result column="create_by" property="createBy" jdbcType="BIGINT"/>
+        <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
+        <result column="update_by" property="updateBy" jdbcType="BIGINT"/>
+        <result column="update_time" property="updateTime" jdbcType="TIMESTAMP"/>
+        <result column="remark" property="remark" jdbcType="VARCHAR"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, parent_id, product_id, activity_code, activity_name, estimated_price,
+        activity_start_time, activity_end_time,
+        register_start_time, register_end_time, take_item_time, take_item_type,
+        auction_start_time, auction_end_time, actual_end_time, starting_price,
+        deposit_price, incr_step, time_step, tax_point, commission,
+        current_price, current_price_user_id, bid_count, view_count,
+        status, estimated_size, unit, survey_time, platform_manager, platform_manager_phone,
+        audit_status, audit_remark, file, product_type,
+        create_by, create_time, update_by, update_time, remark
+    </sql>
+
+    <update id="updateStatus">
+        UPDATE auction_activity
+        SET status = #{status}
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateActualEndTime">
+        UPDATE auction_activity
+        SET actual_end_time = #{actualEndTime}
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateCurrentPrice">
+        UPDATE auction_activity
+        SET current_price = #{currentPrice},
+            current_price_user_id = #{userId},
+            bid_count = bid_count + 1
+        WHERE id = #{id}
+    </update>
+
+    <update id="incrementViewCount">
+        UPDATE auction_activity
+        SET view_count = view_count + 1
+        WHERE id = #{id}
+    </update>
+
+</mapper>

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.lytboot.auction.mapper.AuctionSettlementMapper">
+
+    <resultMap id="BaseResultMap" type="com.lytboot.auction.domain.entity.AuctionSettlement">
+        <id column="id" property="id" jdbcType="BIGINT"/>
+        <result column="deal_id" property="dealId" jdbcType="BIGINT"/>
+        <result column="activity_id" property="activityId" jdbcType="BIGINT"/>
+        <result column="user_id" property="userId" jdbcType="BIGINT"/>
+        <result column="real_name" property="realName" jdbcType="VARCHAR"/>
+        <result column="settlement_size" property="settlementSize" jdbcType="DECIMAL"/>
+        <result column="settlement_amount" property="settlementAmount" jdbcType="DECIMAL"/>
+        <result column="deposit_deduct_amount" property="depositDeductAmount" jdbcType="DECIMAL"/>
+        <result column="actual_pay_amount" property="actualPayAmount" jdbcType="DECIMAL"/>
+        <result column="pay_type" property="payType" jdbcType="VARCHAR"/>
+        <result column="is_invoice" property="isInvoice" jdbcType="VARCHAR"/>
+        <result column="invoice_voucher" property="invoiceVoucher" jdbcType="VARCHAR"/>
+        <result column="pay_voucher" property="payVoucher" jdbcType="VARCHAR"/>
+        <result column="pay_trade_no" property="payTradeNo" jdbcType="VARCHAR"/>
+        <result column="pay_time" property="payTime" jdbcType="TIMESTAMP"/>
+        <result column="audit_status" property="auditStatus" jdbcType="VARCHAR"/>
+        <result column="audit_by" property="auditBy" jdbcType="BIGINT"/>
+        <result column="audit_time" property="auditTime" jdbcType="TIMESTAMP"/>
+        <result column="audit_remark" property="auditRemark" jdbcType="VARCHAR"/>
+        <result column="settlement_time" property="settlementTime" jdbcType="TIMESTAMP"/>
+        <result column="tax_price" property="taxPrice" jdbcType="DECIMAL"/>
+        <result column="create_by" property="createBy" jdbcType="BIGINT"/>
+        <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
+        <result column="update_by" property="updateBy" jdbcType="BIGINT"/>
+        <result column="update_time" property="updateTime" jdbcType="TIMESTAMP"/>
+        <result column="remark" property="remark" jdbcType="VARCHAR"/>
+    </resultMap>
+
+    <select id="selectByDealId" resultMap="BaseResultMap">
+        SELECT * FROM auction_settlement WHERE deal_id = #{dealId} LIMIT 1
+    </select>
+
+</mapper>

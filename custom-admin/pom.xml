@@ -54,6 +54,11 @@
             <artifactId>custom-chat</artifactId>
         </dependency>
 
+        <dependency>
+            <groupId>com.lytboot</groupId>
+            <artifactId>custom-auction</artifactId>
+        </dependency>
+
     </dependencies>
 
     <build>
